@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import SwiftUI
 
 @MainActor
@@ -7,7 +6,6 @@ final class WalkingWindowController {
     private var panel: NSPanel?
     private var hostingController: NSHostingController<WalkingPetView>?
     private let viewModel: PetViewModel
-    private var cancellables: Set<AnyCancellable> = []
 
     init(viewModel: PetViewModel) {
         self.viewModel = viewModel
@@ -42,35 +40,11 @@ final class WalkingWindowController {
         panel.orderFront(nil)
         self.panel = panel
         self.hostingController = hostingController
-
-        viewModel.$walkSpeechBubble
-            .removeDuplicates { ($0 == nil) == ($1 == nil) }
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.resizePanelKeepingBottom()
-            }
-            .store(in: &cancellables)
     }
 
     func hide() {
-        cancellables.removeAll()
         panel?.close()
         panel = nil
         hostingController = nil
-    }
-
-    private func resizePanelKeepingBottom() {
-        guard let panel, let hostingController else { return }
-        // Wait one tick for SwiftUI to lay out the new content.
-        DispatchQueue.main.async { [weak panel, weak hostingController] in
-            guard let panel, let hostingController else { return }
-            let oldFrame = panel.frame
-            let newSize = hostingController.view.fittingSize
-            let newOrigin = NSPoint(
-                x: oldFrame.origin.x,
-                y: oldFrame.origin.y - (newSize.height - oldFrame.size.height)
-            )
-            panel.setFrame(NSRect(origin: newOrigin, size: newSize), display: true, animate: false)
-        }
     }
 }

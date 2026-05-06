@@ -7,10 +7,15 @@ struct WalkingPetView: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            if let bubble = viewModel.walkSpeechBubble {
-                speechBubble(text: bubble)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+            // Fixed-height reservation for speech bubble — prevents window resize
+            ZStack(alignment: .top) {
+                Color.clear
+                if let bubble = viewModel.walkSpeechBubble {
+                    speechBubble(text: bubble)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
             }
+            .frame(height: 56)
 
             ZStack {
                 RoundedRectangle(cornerRadius: 14)
@@ -36,7 +41,7 @@ struct WalkingPetView: View {
                     .padding(.horizontal, 10)
                     .padding(.bottom, 8)
                 }
-                .padding(.top, 10)
+                .padding(.top, 20)
             }
             .frame(width: 130)
         }
