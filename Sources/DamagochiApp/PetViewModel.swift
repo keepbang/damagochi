@@ -418,6 +418,56 @@ final class PetViewModel: ObservableObject {
         showNotification("펫을 방생했습니다. 새 알이 생겼어요!", icon: "bird.fill")
     }
 
+    // MARK: - Migration
+
+    func exportPet() {
+        let panel = NSSavePanel()
+        panel.title = "이사하기 — 캐릭터 데이터 내보내기"
+        panel.nameFieldStringValue = "damagochi-pet.json"
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try store.export(to: url)
+            showNotification("캐릭터 데이터를 내보냈습니다!", icon: "tray.and.arrow.up.fill")
+        } catch {
+            showNotification("내보내기 실패: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill")
+        }
+    }
+
+    func importPet() {
+        let panel = NSOpenPanel()
+        panel.title = "이사오기 — 캐릭터 데이터 가져오기"
+        panel.allowedContentTypes = [.json]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.urls.first else { return }
+        do {
+            var imported = try store.importState(from: url)
+
+            // 기존 펫이 있으면 방생 처리 후 묘지에 추가
+            let previousEntries = state.graveyardEntries
+            let previousDeathCount = state.deathCount
+            if state.phase == .alive || state.phase == .egg {
+                let entry = GraveyardEntry(from: state, cause: "이사")
+                imported.graveyardEntries = previousEntries + [entry] + imported.graveyardEntries
+            } else {
+                imported.graveyardEntries = previousEntries + imported.graveyardEntries
+            }
+            imported.deathCount = previousDeathCount + imported.deathCount
+
+            // 현재 머신 ID로 교체
+            imported.machineId = state.machineId
+
+            state = imported
+            save()
+            showNotification("이사 완료! 새 캐릭터로 시작합니다.", icon: "tray.and.arrow.down.fill")
+        } catch {
+            showNotification("가져오기 실패: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill")
+        }
+    }
+
     // MARK: - Rebirth
 
     func rebirth() {
