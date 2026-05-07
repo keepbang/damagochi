@@ -4,6 +4,7 @@ import DamagochiCore
 struct SettingsView: View {
     @ObservedObject var viewModel: PetViewModel
     @State private var showReleaseConfirm = false
+    @State private var showImportConfirm = false
     @State private var commandCopied = false
 
     var body: some View {
@@ -47,6 +48,7 @@ struct SettingsView: View {
                     if viewModel.state.phase == .alive || viewModel.state.phase == .egg {
                         releaseSection
                     }
+                    migrationSection
                     appInfoSection
                 }
                 .padding(12)
@@ -62,6 +64,16 @@ struct SettingsView: View {
             Button("취소", role: .cancel) {}
         } message: {
             Text("현재 펫은 묘지에 기록되고 새로운 알이 생성됩니다.")
+        }
+        .confirmationDialog(
+            "이사오기",
+            isPresented: $showImportConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("이사오기", role: .destructive) { viewModel.importPet() }
+            Button("취소", role: .cancel) {}
+        } message: {
+            Text("기존 캐릭터가 있으면 방생되고 가져온 캐릭터로 교체됩니다.")
         }
     }
 
@@ -168,6 +180,39 @@ struct SettingsView: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .tint(.teal)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.3)))
+    }
+
+    // MARK: - Migration
+
+    private var migrationSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("이사하기 / 이사오기", systemImage: "arrow.left.arrow.right.circle.fill")
+                .font(.caption.bold())
+
+            Text("다른 PC로 캐릭터를 옮기거나 다른 계정의 캐릭터를 가져옵니다.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 8) {
+                Button(action: { viewModel.exportPet() }) {
+                    Label("이사하기", systemImage: "tray.and.arrow.up.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(.blue)
+
+                Button(action: { showImportConfirm = true }) {
+                    Label("이사오기", systemImage: "tray.and.arrow.down.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .tint(.orange)
+            }
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.3)))
