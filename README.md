@@ -210,7 +210,7 @@ Hook이 작동하지 않는 경우, 설정 탭에서 **Hook 제거 후 재설치
 
 ## 📋 라이선스
 
-MIT License - [LICENSE](./LICENSE) 파일 참고
+GNU AFFERO GENERAL PUBLIC LICENSE - [LICENSE](./LICENSE) 파일 참고
 
 ## 🙏 감사의 말
 
