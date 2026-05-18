@@ -2,7 +2,7 @@
 
 > Claude Code를 사용할 때마다 성장하는 macOS 메뉴바 다마고치 앱
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL 3.0](https://img.shields.io/badge/License-AGPL%203.0-yellow.svg)](https://opensource.org/license/agpl-3-0)
 [![Swift 5.10+](https://img.shields.io/badge/Swift-5.10+-orange.svg)](https://www.swift.org)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue.svg)](https://www.apple.com/kr/macos)
 
