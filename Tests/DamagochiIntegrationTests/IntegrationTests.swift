@@ -132,6 +132,9 @@ final class IntegrationTests: XCTestCase {
     // MARK: - EventBridge File Round-Trip Pipeline
 
     func testEventBridgeFileRoundTrip() {
+        _ = EventBridge.drainFileEvents()
+        defer { _ = EventBridge.drainFileEvents() }
+
         let event = BehaviorEvent(kind: .prompt, metadata: ["source": "test"])
         EventBridge.post(event: event)
 
@@ -141,6 +144,9 @@ final class IntegrationTests: XCTestCase {
     }
 
     func testEventBridgeDrainProcessesThroughFeedProcessor() {
+        _ = EventBridge.drainFileEvents()
+        defer { _ = EventBridge.drainFileEvents() }
+
         var state = PetState(machineId: "test-bridge")
 
         // Post events via bridge

@@ -24,11 +24,10 @@ public struct EquipmentDropper: Sendable {
 
     private func randomItem(slot: EquipmentSlot, rarity: Rarity, level: Int, excluding: [String]) -> Equipment {
         let pool = Self.itemPool.filter { $0.slot == slot && $0.rarity == rarity && !excluding.contains($0.id) }
-        let fallbackPool = Self.itemPool.filter { $0.slot == slot && $0.rarity == rarity }
-        let candidates = pool.isEmpty ? fallbackPool : pool
-        if let picked = candidates.randomElement() {
+        if let picked = pool.randomElement() {
             return picked
         }
+        // Every level-up promises a drop; create a unique item after a category is exhausted.
         return Equipment(
             id: "item_\(slot.rawValue)_\(rarity.rawValue)_lv\(level)",
             name: "\(rarity.rawValue) \(slot.rawValue) Lv.\(level)",

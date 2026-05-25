@@ -6,7 +6,7 @@ import DamagochiCore
 struct DamagochiCLI: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "damagochi",
-        abstract: "Damagochi CLI helper for Claude Code hooks",
+        abstract: "Damagochi CLI helper for coding agent hooks",
         subcommands: [Feed.self]
     )
 }
@@ -19,9 +19,15 @@ struct Feed: ParsableCommand {
     @Argument(help: "Event type: prompt, tool, session, stop, notification")
     var eventType: String
 
+    @Option(name: .long, help: "Activity source: claude or codex")
+    var source: String = ActivitySource.claude.rawValue
+
     func run() throws {
         let kind: EventKind
-        var metadata: [String: String] = [:]
+        guard ActivitySource(rawValue: source) != nil else {
+            throw ValidationError("Unknown source: \(source). Use: claude, codex")
+        }
+        var metadata: [String: String] = ["source": source]
 
         switch eventType {
         case "prompt":
@@ -31,7 +37,7 @@ struct Feed: ParsableCommand {
 
         case "tool":
             kind = .toolUse
-            // Claude Code가 PostToolUse hook에 stdin으로 JSON 전달
+            // Hook 제공자가 stdin으로 전달하는 JSON에서 도구 이름을 읽는다.
             if let data = readStdin(),
                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 let toolName = json["tool_name"] as? String

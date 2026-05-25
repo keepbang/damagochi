@@ -88,6 +88,7 @@ public struct FeedProcessor: Sendable {
         case .sessionStart: state.totalSessions += 1
         case .stop, .notification: break
         }
+        state.recordActivity(event.kind, source: event.source)
 
         personalityTracker.updateMbti(scores: &state.mbtiScores, event: event)
 

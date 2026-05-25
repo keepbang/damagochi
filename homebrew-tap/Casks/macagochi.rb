@@ -4,7 +4,7 @@ cask "macagochi" do
 
   url "https://github.com/keepbang/macagochi/releases/download/v#{version}/Damagochi.zip"
   name "Macagochi"
-  desc "Claude Code 활동으로 성장하는 다마고치 메뉴바 앱"
+  desc "Claude Code 또는 Codex 활동으로 성장하는 다마고치 메뉴바 앱"
   homepage "https://github.com/keepbang/macagochi"
 
   app "Damagochi/Damagochi.app"
@@ -28,7 +28,7 @@ cask "macagochi" do
   ]
 
   caveats <<~EOS
-    앱을 실행하면 온보딩에서 Claude Code 훅이 자동으로 등록됩니다:
+    앱을 실행하면 온보딩에서 Claude Code와 Codex 훅을 등록할 수 있습니다:
       open /Applications/Damagochi.app
   EOS
 end

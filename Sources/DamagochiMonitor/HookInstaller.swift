@@ -21,11 +21,11 @@ public struct HookInstaller: Sendable {
 
     public static var defaultHooks: [String: [HookEntry]] {
         [
-            "UserPromptSubmit": [HookEntry(command: "damagochi feed prompt")],
-            "PostToolUse": [HookEntry(command: "damagochi feed tool")],
-            "SessionStart": [HookEntry(command: "damagochi feed session")],
-            "Stop": [HookEntry(command: "damagochi feed stop")],
-            "Notification": [HookEntry(command: "damagochi feed notification")],
+            "UserPromptSubmit": [HookEntry(command: "damagochi feed prompt --source claude")],
+            "PostToolUse": [HookEntry(command: "damagochi feed tool --source claude")],
+            "SessionStart": [HookEntry(command: "damagochi feed session --source claude")],
+            "Stop": [HookEntry(command: "damagochi feed stop --source claude")],
+            "Notification": [HookEntry(command: "damagochi feed notification --source claude")],
         ]
     }
 

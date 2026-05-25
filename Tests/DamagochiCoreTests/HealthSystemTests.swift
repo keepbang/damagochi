@@ -9,10 +9,10 @@ import Testing
     state.hunger = 100
     state.mood = 100
 
-    system.applyDecay(to: &state, inactiveDays: 2)
+    system.applyDecay(to: &state, inactiveHours: 24)
     #expect(state.hp == 80)
-    #expect(state.hunger == 70)
-    #expect(state.mood == 90)
+    #expect(state.hunger == 60)
+    #expect(state.mood == 80)
 }
 
 @Test func decayDoesNotGoBelowZero() {
@@ -23,7 +23,7 @@ import Testing
     state.hunger = 10
     state.mood = 3
 
-    system.applyDecay(to: &state, inactiveDays: 2)
+    system.applyDecay(to: &state, inactiveHours: 48)
     #expect(state.hp == 0)
     #expect(state.hunger == 0)
     #expect(state.mood == 0)
@@ -63,6 +63,6 @@ import Testing
     state.phase = .egg
     state.hp = 100
 
-    system.applyDecay(to: &state, inactiveDays: 5)
+    system.applyDecay(to: &state, inactiveHours: 120)
     #expect(state.hp == 100)
 }

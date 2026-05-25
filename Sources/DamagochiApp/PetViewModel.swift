@@ -41,7 +41,8 @@ final class PetViewModel: ObservableObject {
     @Published var state: PetState
     @Published var selectedTab: AppTab = .pet
     @Published var notification: PetNotification?
-    @Published var hookInstalled: Bool = false
+    @Published var claudeHookInstalled: Bool = false
+    @Published var codexHookInstalled: Bool = false
     @Published var notificationsEnabled: Bool {
         didSet { UserDefaults.standard.set(notificationsEnabled, forKey: "notificationsEnabled") }
     }
@@ -50,7 +51,8 @@ final class PetViewModel: ObservableObject {
     private let processor = FeedProcessor()
     private let deathChecker = DeathChecker()
     private let inventoryManager = InventoryManager()
-    private let hookInstaller = HookInstaller()
+    private let claudeHookInstaller = HookInstaller()
+    private let codexHookInstaller = CodexHookInstaller()
     private let notificationManager = NotificationManager.shared
     private var eventObserver: NSObjectProtocol?
     private var monitor: ClaudeSessionMonitor?
@@ -148,10 +150,11 @@ final class PetViewModel: ObservableObject {
         self.state = store.load() ?? PetState(machineId: hostHash)
         // Auto-upgrade older damagochi hook installs so newly added Stop/Notification hooks land
         // without forcing the user to manually re-install.
-        if !hookInstaller.isInstalled() && hookInstaller.hasAnyDamagochiHook() {
-            try? hookInstaller.install()
+        if !claudeHookInstaller.isInstalled() && claudeHookInstaller.hasAnyDamagochiHook() {
+            try? claudeHookInstaller.install()
         }
-        self.hookInstalled = hookInstaller.isInstalled()
+        self.claudeHookInstalled = claudeHookInstaller.isInstalled()
+        self.codexHookInstalled = codexHookInstaller.isInstalled()
     }
 
     func start() {
@@ -191,7 +194,7 @@ final class PetViewModel: ObservableObject {
                 Task { @MainActor in self?.handleDelta(delta) }
             },
             onSessionStart: { [weak self] in
-                let event = BehaviorEvent(kind: .sessionStart)
+                let event = BehaviorEvent(kind: .sessionStart, metadata: ["source": ActivitySource.claude.rawValue])
                 Task { @MainActor in self?.handleEvent(event) }
             }
         )
@@ -384,17 +387,40 @@ final class PetViewModel: ObservableObject {
 
     // MARK: - Hook Management
 
-    func installHooks() {
+    var anyHookInstalled: Bool {
+        claudeHookInstalled || codexHookInstalled
+    }
+
+    func installAllHooks() {
+        installClaudeHooks()
+        installCodexHooks()
+    }
+
+    func installClaudeHooks() {
         do {
-            try hookInstaller.install()
-            hookInstalled = true
+            try claudeHookInstaller.install()
+            claudeHookInstalled = true
         } catch {}
     }
 
-    func uninstallHooks() {
+    func uninstallClaudeHooks() {
         do {
-            try hookInstaller.uninstall()
-            hookInstalled = false
+            try claudeHookInstaller.uninstall()
+            claudeHookInstalled = false
+        } catch {}
+    }
+
+    func installCodexHooks() {
+        do {
+            try codexHookInstaller.install()
+            codexHookInstalled = true
+        } catch {}
+    }
+
+    func uninstallCodexHooks() {
+        do {
+            try codexHookInstaller.uninstall()
+            codexHookInstalled = false
         } catch {}
     }
 
@@ -509,11 +535,11 @@ final class PetViewModel: ObservableObject {
         let oldPhase = state.phase
         var combinedResult = FeedResult()
         for _ in 0..<delta.newPrompts {
-            let r = processor.process(event: BehaviorEvent(kind: .prompt), state: &state)
+            let r = processor.process(event: BehaviorEvent(kind: .prompt, metadata: ["source": ActivitySource.claude.rawValue]), state: &state)
             combinedResult = combinedResult.merged(with: r)
         }
         for _ in 0..<delta.newToolUses {
-            let r = processor.process(event: BehaviorEvent(kind: .toolUse), state: &state)
+            let r = processor.process(event: BehaviorEvent(kind: .toolUse, metadata: ["source": ActivitySource.claude.rawValue]), state: &state)
             combinedResult = combinedResult.merged(with: r)
         }
         checkNotifications(oldLevel: oldLevel, oldPhase: oldPhase, result: combinedResult)
