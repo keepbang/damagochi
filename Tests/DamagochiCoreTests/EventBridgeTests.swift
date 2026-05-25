@@ -39,6 +39,21 @@ import Foundation
     #expect(decoded.metadata?["source"] == "hook")
 }
 
+@Test func legacyPetStateWithoutSourceStatsStillDecodes() throws {
+    let state = PetState(machineId: "legacy")
+    var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(state)) as! [String: Any]
+    json.removeValue(forKey: "claudeStats")
+    json.removeValue(forKey: "codexStats")
+
+    let decoded = try JSONDecoder().decode(
+        PetState.self,
+        from: JSONSerialization.data(withJSONObject: json)
+    )
+
+    #expect(decoded.stats(for: .claude) == ActivityStats())
+    #expect(decoded.stats(for: .codex) == ActivityStats())
+}
+
 @Test func sessionDeltaHasActivity() {
     let empty = SessionDelta()
     #expect(!empty.hasActivity)

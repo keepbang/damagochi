@@ -200,7 +200,7 @@ struct PopoverView: View {
             statusBar(label: "HP", value: viewModel.state.hp, color: .red)
                 .help("체력: 활동하면 회복됩니다. 0이 되면 사망합니다.")
             statusBar(label: "배고픔", value: viewModel.state.hunger, color: .orange)
-                .help("배고픔: Claude Code 사용 시 증가합니다. 낮아지면 펫이 약해집니다.")
+                .help("배고픔: Claude Code 또는 Codex 사용 시 증가합니다. 낮아지면 펫이 약해집니다.")
             statusBar(label: "기분", value: viewModel.state.mood, color: .blue)
                 .help("기분: 버그를 잡거나 활발하게 활동하면 올라갑니다.")
         }
@@ -269,7 +269,7 @@ struct PopoverView: View {
                     .onHover { statsTooltip = $0 ? "툴 사용 횟수 (Read, Edit, Grep 등)" : nil }
                 Spacer()
                 statItem(icon: "play.circle", count: viewModel.state.totalSessions)
-                    .onHover { statsTooltip = $0 ? "Claude Code 세션 시작 횟수" : nil }
+                    .onHover { statsTooltip = $0 ? "Claude Code / Codex 세션 시작 횟수" : nil }
                 Spacer()
                 streakItem
                     .onHover { statsTooltip = $0 ? "연속 코딩 일수 (매일 사용 시 유지)" : nil }

@@ -24,6 +24,16 @@ import Testing
     #expect(!item.description.isEmpty)
 }
 
+@Test func dropEquipmentCreatesUniqueRewardWhenKnownItemsAreExhausted() {
+    let dropper = EquipmentDropper()
+    let existingIds = EquipmentDropper.itemPool.map(\.id)
+
+    let item = dropper.dropEquipment(forLevel: 99, excluding: existingIds)
+
+    #expect(!existingIds.contains(item.id))
+    #expect(item.id.contains("lv99"))
+}
+
 @Test func dropCoversAllSlots() {
     let dropper = EquipmentDropper()
     var slots: Set<EquipmentSlot> = []

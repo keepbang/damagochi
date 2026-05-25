@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import DamagochiCore
 
 @Test func feedProcessorAddsXp() {
@@ -52,6 +53,45 @@ import Testing
     #expect(state.totalXp == 3)
 }
 
+@Test func feedProcessorTracksStatsSeparatelyByActivitySource() {
+    let processor = FeedProcessor()
+    var state = PetState(machineId: "test-sources")
+
+    processor.process(
+        event: BehaviorEvent(kind: .prompt, metadata: ["source": "claude"]),
+        state: &state
+    )
+    processor.process(
+        event: BehaviorEvent(kind: .toolUse, metadata: ["source": "codex"]),
+        state: &state
+    )
+    processor.process(
+        event: BehaviorEvent(kind: .sessionStart, metadata: ["source": "codex"]),
+        state: &state
+    )
+
+    #expect(state.totalPrompts == 1)
+    #expect(state.totalToolUses == 1)
+    #expect(state.totalSessions == 1)
+    #expect(state.stats(for: .claude) == ActivityStats(prompts: 1))
+    #expect(state.stats(for: .codex) == ActivityStats(toolUses: 1, sessions: 1))
+    #expect(state.unclassifiedStats == ActivityStats())
+}
+
+@Test func sourceStatsRemainCompatibleWithLegacyUnclassifiedEvents() {
+    let processor = FeedProcessor()
+    var state = PetState(machineId: "test-legacy-sources")
+
+    processor.process(event: BehaviorEvent(kind: .prompt), state: &state)
+    processor.process(
+        event: BehaviorEvent(kind: .prompt, metadata: ["source": "codex"]),
+        state: &state
+    )
+
+    #expect(state.stats(for: .codex) == ActivityStats(prompts: 1))
+    #expect(state.unclassifiedStats == ActivityStats(prompts: 1))
+}
+
 @Test func feedProcessorUpdatesMbti() {
     let processor = FeedProcessor()
     var state = PetState(machineId: "test")
@@ -83,7 +123,7 @@ import Testing
     state.phase = .alive
 
     // 월요일 (weekday == 2)
-    var components = DateComponents(year: 2026, month: 1, day: 5, hour: 10)
+    let components = DateComponents(year: 2026, month: 1, day: 5, hour: 10)
     let monday = try #require(Calendar.current.date(from: components))
 
     processor.process(event: BehaviorEvent(kind: .sessionStart, timestamp: monday), state: &state)

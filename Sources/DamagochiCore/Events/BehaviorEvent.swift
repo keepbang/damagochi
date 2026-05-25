@@ -8,6 +8,11 @@ public enum EventKind: String, Codable, Sendable {
     case notification
 }
 
+public enum ActivitySource: String, Codable, Sendable {
+    case claude
+    case codex
+}
+
 public struct BehaviorEvent: Codable, Sendable {
     public let kind: EventKind
     public let timestamp: Date
@@ -17,5 +22,9 @@ public struct BehaviorEvent: Codable, Sendable {
         self.kind = kind
         self.timestamp = timestamp
         self.metadata = metadata
+    }
+
+    public var source: ActivitySource? {
+        metadata?["source"].flatMap(ActivitySource.init(rawValue:))
     }
 }

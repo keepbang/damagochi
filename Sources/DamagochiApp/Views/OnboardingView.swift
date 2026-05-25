@@ -16,7 +16,7 @@ struct OnboardingView: View {
                 .font(.headline)
                 .multilineTextAlignment(.center)
 
-            Text("Claude Code를 사용하면 경험치가 쌓이고\n가상 펫이 성장합니다.")
+            Text("Claude Code 또는 Codex를 사용하면\n경험치가 쌓이고 가상 펫이 성장합니다.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -26,8 +26,8 @@ struct OnboardingView: View {
                 .padding(.horizontal, 20)
 
             VStack(alignment: .leading, spacing: 8) {
-                stepRow(number: 1, text: "Claude Code Hook을 설치합니다")
-                stepRow(number: 2, text: "Claude Code를 사용하면 XP가 쌓입니다")
+                stepRow(number: 1, text: "Claude Code와 Codex Hook을 설치합니다")
+                stepRow(number: 2, text: "코딩 에이전트를 사용하면 XP가 쌓입니다")
                 stepRow(number: 3, text: "100 XP에 알이 부화합니다")
                 stepRow(number: 4, text: "펫을 키우고 장비를 모으세요!")
             }
@@ -36,11 +36,11 @@ struct OnboardingView: View {
             Spacer(minLength: 8)
 
             VStack(spacing: 8) {
-                if !viewModel.hookInstalled {
+                if !viewModel.anyHookInstalled {
                     Button(action: {
-                        viewModel.installHooks()
+                        viewModel.installAllHooks()
                     }) {
-                        Label("Hook 설치하기", systemImage: "link.badge.plus")
+                        Label("두 Hook 설치하기", systemImage: "link.badge.plus")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -55,7 +55,7 @@ struct OnboardingView: View {
                     UserDefaults.standard.set(true, forKey: "onboardingCompleted")
                     showOnboarding = false
                 }) {
-                    Text(viewModel.hookInstalled ? "시작하기" : "나중에 설치하기")
+                    Text(viewModel.anyHookInstalled ? "시작하기" : "나중에 설치하기")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)

@@ -1,6 +1,6 @@
 # 🐣 Damagochi
 
-> Claude Code를 사용할 때마다 성장하는 macOS 메뉴바 다마고치 앱
+> Claude Code 또는 Codex를 사용할 때마다 성장하는 macOS 메뉴바 다마고치 앱
 
 [![License: AGPL 3.0](https://img.shields.io/badge/License-AGPL%203.0-yellow.svg)](https://opensource.org/license/agpl-3-0)
 [![Swift 5.10+](https://img.shields.io/badge/Swift-5.10+-orange.svg)](https://www.swift.org)
@@ -14,7 +14,7 @@
 
 **Damagochi**는 당신의 코딩 활동을 추적하고 펫을 키우는 macOS 메뉴바 애플리케이션입니다.
 
-Claude Code의 Hook 시스템과 통합되어, 프롬프트 입력, 툴 사용, 세션 시작 등의 개발 활동을 감지합니다. 이러한 활동들이 쌓이면서 당신의 펫이 부화하고, 레벨업하며, MBTI 기반의 고유한 성격을 형성합니다.
+Claude Code 및 Codex의 Hook 시스템과 통합되어, 프롬프트 입력, 툴 사용, 세션 시작 등의 개발 활동을 감지합니다. 이러한 활동들이 쌓이면서 당신의 펫이 부화하고, 레벨업하며, MBTI 기반의 고유한 성격을 형성합니다.
 
 ### 핵심 특징
 
@@ -27,7 +27,7 @@ Claude Code의 Hook 시스템과 통합되어, 프롬프트 입력, 툴 사용, 
 - 🎖️ **업적 시스템** - 각종 도전 과제 완료 및 수집
 - 🛠️ **장비 시스템** - 레벨업 드롭 장비로 펫 꾸미기
 - 📊 **통계 & 추모관** - 키워본 펫들의 기록 관리
-- 🤖 **Claude Code 연동** - Hook 자동 설치로 즉시 시작
+- 🤖 **Claude Code / Codex 연동** - Hook 설치로 즉시 시작
 
 ## 🚀 설치
 
@@ -39,7 +39,7 @@ brew install --cask keepbang/damagochi/damagochi
 open /Applications/Damagochi.app
 ```
 
-앱 실행 후 **온보딩 화면에서 Claude Code Hook이 자동으로 등록**됩니다.
+앱 실행 후 **온보딩 화면에서 Claude Code와 Codex Hook을 등록**할 수 있습니다. Codex Hook은 설치 후 Codex에서 `/hooks`를 열어 신뢰 처리를 완료해야 실행됩니다.
 
 ### 업데이트
 
@@ -71,7 +71,7 @@ brew untap keepbang/damagochi
 
 1. **앱 실행**: `/Applications/Damagochi.app` 더블클릭
 2. **Hook 등록**: 온보딩 화면에서 자동 처리
-3. **코딩 시작**: Claude Code를 사용하면 자동으로 펫이 성장합니다
+3. **코딩 시작**: Claude Code 또는 Codex를 사용하면 자동으로 펫이 성장합니다
 
 ### 메뉴바 상호작용
 
@@ -104,7 +104,7 @@ brew untap keepbang/damagochi
 
 ### 스트릭 보너스
 
-매일 Claude Code를 사용하면 스트릭이 유지되며 XP 배율이 증가합니다.
+매일 Claude Code 또는 Codex를 사용하면 스트릭이 유지되며 XP 배율이 증가합니다.
 
 | 연속일 | XP 배율 | 마일스톤 보상 |
 |--------|---------|-------------|
@@ -175,7 +175,7 @@ brew untap keepbang/damagochi
 ### 건강 & 관리
 
 - ❤️ **체력**: 활동으로 회복, 방치 시 감소
-- 😋 **배고픔**: Claude Code 사용 시 증가
+- 😋 **배고픔**: Claude Code 또는 Codex 사용 시 증가
 - 😊 **기분**: 버그 잡기, 활발한 활동으로 상승
 - 💀 **사망**: 14 영업일 이상 비활동 시 발생 (기록은 추모관에 저장)
 - 🕊️ **방생**: 설정 탭에서 언제든지 펫을 보내고 새 알 시작 가능

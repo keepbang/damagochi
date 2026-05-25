@@ -3,7 +3,7 @@ import Foundation
 public struct HealthSystem: Sendable {
     public init() {}
 
-    /// 마지막 Claude Code 활동 이후 경과 시간 기반 decay
+    /// 마지막 코딩 에이전트 활동 이후 경과 시간 기반 decay
     /// - 0~4시간: 감소 없음
     /// - 4시간 초과부터 시간당 조금씩 감소
     public func applyDecay(to state: inout PetState, inactiveHours: Int) {

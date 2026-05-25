@@ -24,7 +24,8 @@ import Foundation
 
     let promptHooks = hooks["UserPromptSubmit"] as! [[String: Any]]
     #expect(promptHooks.count == 1)
-    #expect((promptHooks[0]["command"] as? String) == "damagochi feed prompt")
+    let commands = promptHooks[0]["hooks"] as! [[String: Any]]
+    #expect((commands[0]["command"] as? String) == "damagochi feed prompt --source claude")
 }
 
 @Test func installPreservesExistingHooks() throws {
@@ -36,7 +37,7 @@ import Foundation
     let existing: [String: Any] = [
         "hooks": [
             "UserPromptSubmit": [
-                ["command": "echo existing"]
+                ["hooks": [["type": "command", "command": "echo existing"]]]
             ]
         ],
         "otherSetting": true
@@ -56,9 +57,11 @@ import Foundation
     let promptHooks = hooks["UserPromptSubmit"] as! [[String: Any]]
     #expect(promptHooks.count == 2)
 
-    let commands = promptHooks.compactMap { $0["command"] as? String }
+    let commands = promptHooks.compactMap {
+        ($0["hooks"] as? [[String: Any]])?.first?["command"] as? String
+    }
     #expect(commands.contains("echo existing"))
-    #expect(commands.contains("damagochi feed prompt"))
+    #expect(commands.contains("damagochi feed prompt --source claude"))
 }
 
 @Test func uninstallRemovesDamagochiHooks() throws {
@@ -85,8 +88,8 @@ import Foundation
     let existing: [String: Any] = [
         "hooks": [
             "UserPromptSubmit": [
-                ["command": "echo existing"],
-                ["command": "damagochi feed prompt"]
+                ["hooks": [["type": "command", "command": "echo existing"]]],
+                ["hooks": [["type": "command", "command": "damagochi feed prompt --source claude"]]]
             ]
         ]
     ]
@@ -101,7 +104,8 @@ import Foundation
     let hooks = json["hooks"] as! [String: Any]
     let promptHooks = hooks["UserPromptSubmit"] as! [[String: Any]]
     #expect(promptHooks.count == 1)
-    #expect((promptHooks[0]["command"] as? String) == "echo existing")
+    let commands = promptHooks[0]["hooks"] as! [[String: Any]]
+    #expect((commands[0]["command"] as? String) == "echo existing")
 }
 
 @Test func installIsIdempotent() throws {

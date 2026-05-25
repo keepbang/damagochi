@@ -43,6 +43,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(spacing: 12) {
                     hookSection
+                    activityStatsSection
                     notificationSection
                     petInfoSection
                     if viewModel.state.phase == .alive || viewModel.state.phase == .egg {
@@ -81,40 +82,98 @@ struct SettingsView: View {
 
     private var hookSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Claude Code 연동", systemImage: "link.circle.fill")
+            Label("코딩 에이전트 연동", systemImage: "link.circle.fill")
                 .font(.caption.bold())
 
-            HStack {
-                Circle()
-                    .fill(viewModel.hookInstalled ? .green : .red)
-                    .frame(width: 8, height: 8)
-                Text(viewModel.hookInstalled ? "Hook 설치됨" : "Hook 미설치")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
+            hookRow(
+                name: "Claude Code",
+                installed: viewModel.claudeHookInstalled,
+                install: viewModel.installClaudeHooks,
+                uninstall: viewModel.uninstallClaudeHooks
+            )
+            hookRow(
+                name: "Codex",
+                installed: viewModel.codexHookInstalled,
+                install: viewModel.installCodexHooks,
+                uninstall: viewModel.uninstallCodexHooks
+            )
 
-                if viewModel.hookInstalled {
-                    Button("제거") {
-                        viewModel.uninstallHooks()
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                    .tint(.red)
-                } else {
-                    Button("설치") {
-                        viewModel.installHooks()
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                }
-            }
-
-            Text("Claude Code 사용 시 자동으로 경험치를 획득합니다")
+            Text("Codex Hook 설치 후 Codex에서 /hooks를 열어 새 Hook을 신뢰해야 실행됩니다.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.3)))
+    }
+
+    private func hookRow(
+        name: String,
+        installed: Bool,
+        install: @escaping () -> Void,
+        uninstall: @escaping () -> Void
+    ) -> some View {
+        HStack {
+            Circle()
+                .fill(installed ? .green : .red)
+                .frame(width: 8, height: 8)
+            Text(name)
+                .font(.caption)
+            Text(installed ? "설치됨" : "미설치")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button(installed ? "제거" : "설치") {
+                installed ? uninstall() : install()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .tint(installed ? .red : .accentColor)
+        }
+    }
+
+    // MARK: - Activity Stats
+
+    private var activityStatsSection: some View {
+        let claude = viewModel.state.stats(for: .claude)
+        let codex = viewModel.state.stats(for: .codex)
+        let unclassified = viewModel.state.unclassifiedStats
+
+        return VStack(alignment: .leading, spacing: 8) {
+            Label("활동 통계", systemImage: "chart.bar.fill")
+                .font(.caption.bold())
+
+            statsHeader
+            activityStatsRow("Claude Code", stats: claude)
+            activityStatsRow("Codex", stats: codex)
+            if unclassified.prompts > 0 || unclassified.toolUses > 0 || unclassified.sessions > 0 {
+                activityStatsRow("기존 미분류", stats: unclassified)
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.3)))
+    }
+
+    private var statsHeader: some View {
+        HStack {
+            Text("출처")
+            Spacer()
+            Text("프롬프트").frame(width: 50, alignment: .trailing)
+            Text("도구").frame(width: 38, alignment: .trailing)
+            Text("세션").frame(width: 38, alignment: .trailing)
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+    }
+
+    private func activityStatsRow(_ source: String, stats: ActivityStats) -> some View {
+        HStack {
+            Text(source)
+            Spacer()
+            Text("\(stats.prompts)").frame(width: 50, alignment: .trailing)
+            Text("\(stats.toolUses)").frame(width: 38, alignment: .trailing)
+            Text("\(stats.sessions)").frame(width: 38, alignment: .trailing)
+        }
+        .font(.caption.monospacedDigit())
     }
 
     // MARK: - Notification Section
@@ -285,7 +344,7 @@ struct SettingsView: View {
 
             HStack {
                 Spacer()
-                Text("Claude Code 사용량 기반 가상 펫")
+                Text("Claude Code / Codex 사용량 기반 가상 펫")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
                 Spacer()
