@@ -13,15 +13,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var walkSubscription: AnyCancellable?
     private var walkingWindowController: WalkingWindowController?
     private var mainWindowController: MainWindowController?
+    private var battleViewModel: BattleViewModel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NotificationManager.shared.requestPermission()
         viewModel.start()
 
+        // The main window and menu bar popover must share one local peer.
+        // Creating a transport per window can advertise this Mac twice.
+        let battleViewModel = BattleViewModel(petViewModel: viewModel)
+        self.battleViewModel = battleViewModel
+
         let popover = NSPopover()
         popover.contentSize = NSSize(width: 280, height: 420)
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: PopoverView(viewModel: viewModel))
+        popover.contentViewController = NSHostingController(
+            rootView: PopoverView(viewModel: viewModel, battleViewModel: battleViewModel)
+        )
         self.popover = popover
 
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -54,7 +62,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
 
-        mainWindowController = MainWindowController(viewModel: viewModel)
+        mainWindowController = MainWindowController(
+            viewModel: viewModel,
+            battleViewModel: battleViewModel
+        )
         mainWindowController?.show()
     }
 

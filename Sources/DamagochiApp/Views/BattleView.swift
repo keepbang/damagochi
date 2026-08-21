@@ -12,6 +12,8 @@ struct BattleView: View {
             Divider()
             content
         }
+        .onAppear { battleVM.activateDiscovery() }
+        .onDisappear { battleVM.deactivateDiscovery() }
     }
 
     // MARK: - Header
@@ -80,7 +82,14 @@ struct BattleView: View {
             }
 
             if let err = battleVM.errorMessage {
-                Text(err).font(.caption).foregroundStyle(.red).padding(.horizontal)
+                HStack(spacing: 6) {
+                    Text(err)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                    Button("다시 시도") { battleVM.retryBrowsing() }
+                        .controlSize(.mini)
+                }
+                .padding(.horizontal)
             }
         }
     }
