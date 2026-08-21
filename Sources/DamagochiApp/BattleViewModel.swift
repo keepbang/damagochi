@@ -47,6 +47,8 @@ final class BattleViewModel: ObservableObject {
     private var myNonce: String = ""
     private var opponentCommitHash: String?
     private var myCommitSent = false
+    private var activeDiscoveryViews = 0
+    private var isBrowsing = false
 
     // MARK: - Init
 
@@ -66,14 +68,41 @@ final class BattleViewModel: ObservableObject {
 
     // MARK: - Actions
 
+    /// Tracks every visible battle view. The app has both a main window and a
+    /// menu bar popover, so discovery stops only after both have disappeared.
+    func activateDiscovery() {
+        activeDiscoveryViews += 1
+        guard activeDiscoveryViews == 1 else { return }
+        guard case .browsing = phase else { return }
+        startBrowsing()
+    }
+
+    func deactivateDiscovery() {
+        guard activeDiscoveryViews > 0 else { return }
+        activeDiscoveryViews -= 1
+        guard activeDiscoveryViews == 0 else { return }
+        stopBrowsing()
+    }
+
     func startBrowsing() {
+        guard case .browsing = phase else { return }
+        guard !isBrowsing else { return }
+        isBrowsing = true
         transport.startBrowsing()
-        phase = .browsing
         foundPeers = []
+        errorMessage = nil
     }
 
     func stopBrowsing() {
+        guard isBrowsing else { return }
+        isBrowsing = false
         transport.stopBrowsing()
+    }
+
+    func retryBrowsing() {
+        guard case .browsing = phase else { return }
+        stopBrowsing()
+        startBrowsing()
     }
 
     func invitePeer(_ peer: FoundPeer) {
@@ -133,7 +162,7 @@ final class BattleViewModel: ObservableObject {
         myNonce = ""
         phase = .browsing
         foundPeers = []
-        transport.startBrowsing()
+        startBrowsing()
     }
 
     // MARK: - Skills for current character
@@ -172,6 +201,7 @@ final class BattleViewModel: ObservableObject {
             foundPeers.removeAll { $0.id == id }
 
         case .connected:
+            stopBrowsing()
             sendMyProfile()
 
         case .disconnected:
@@ -179,12 +209,19 @@ final class BattleViewModel: ObservableObject {
                 errorMessage = "상대방 연결이 끊어졌습니다"
                 phase = .finished(won: true)
                 applyReward(won: true)
+            } else if case .connecting = phase {
+                errorMessage = "상대방과 연결하지 못했습니다"
+                phase = .browsing
+                if activeDiscoveryViews > 0 {
+                    startBrowsing()
+                }
             }
 
         case .messageReceived(let msg):
             handleMessage(msg)
 
         case .error(let err):
+            stopBrowsing()
             errorMessage = err.localizedDescription
         }
     }

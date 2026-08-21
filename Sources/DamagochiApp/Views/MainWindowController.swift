@@ -5,9 +5,11 @@ import SwiftUI
 final class MainWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private let viewModel: PetViewModel
+    private let battleViewModel: BattleViewModel
 
-    init(viewModel: PetViewModel) {
+    init(viewModel: PetViewModel, battleViewModel: BattleViewModel) {
         self.viewModel = viewModel
+        self.battleViewModel = battleViewModel
     }
 
     func show() {
@@ -17,7 +19,9 @@ final class MainWindowController: NSObject, NSWindowDelegate {
             return
         }
 
-        let hostingController = NSHostingController(rootView: PopoverView(viewModel: viewModel))
+        let hostingController = NSHostingController(
+            rootView: PopoverView(viewModel: viewModel, battleViewModel: battleViewModel)
+        )
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 280, height: 420),

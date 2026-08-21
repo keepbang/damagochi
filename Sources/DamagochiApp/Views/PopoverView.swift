@@ -4,13 +4,13 @@ import DamagochiRenderer
 
 struct PopoverView: View {
     @ObservedObject var viewModel: PetViewModel
-    @StateObject private var battleVM: BattleViewModel
+    @ObservedObject private var battleVM: BattleViewModel
     @State private var showOnboarding = !UserDefaults.standard.bool(forKey: "onboardingCompleted")
     @State private var statsTooltip: String? = nil
 
-    init(viewModel: PetViewModel) {
+    init(viewModel: PetViewModel, battleViewModel: BattleViewModel) {
         self.viewModel = viewModel
-        self._battleVM = StateObject(wrappedValue: BattleViewModel(petViewModel: viewModel))
+        self.battleVM = battleViewModel
     }
 
     var body: some View {
