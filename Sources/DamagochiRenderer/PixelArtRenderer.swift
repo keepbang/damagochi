@@ -155,6 +155,7 @@ public struct AnimatedPetView: View {
     let interval: TimeInterval
 
     @State private var currentFrame = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(frames: [PixelSprite], scale: CGFloat = 8.0, interval: TimeInterval = 0.5) {
         self.frames = frames
@@ -173,8 +174,11 @@ public struct AnimatedPetView: View {
         .onReceive(
             Timer.publish(every: interval, on: .main, in: .common).autoconnect()
         ) { _ in
-            guard frames.count > 1 else { return }
+            guard !reduceMotion, frames.count > 1 else { return }
             currentFrame = (currentFrame + 1) % frames.count
+        }
+        .onChange(of: reduceMotion) { _, isReduced in
+            if isReduced { currentFrame = 0 }
         }
     }
 }

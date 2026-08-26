@@ -8,15 +8,18 @@ import DamagochiCore
 public final class LocalNetworkTransport: NSObject, BattleTransport, @unchecked Sendable {
 
     private static let serviceType = "damagochi-btl"
+    private static let displayNameKey = "displayName"
 
     private let myPeerId: MCPeerID
     private let session: MCSession
-    private let advertiser: MCNearbyServiceAdvertiser
+    private var advertiser: MCNearbyServiceAdvertiser
     private let browser: MCNearbyServiceBrowser
 
     private var continuation: AsyncStream<BattleTransportEvent>.Continuation?
     private let lock = NSLock()
     private var _connectedPeerId: MCPeerID?
+    private var _displayName: String
+    private var _isBrowsing = false
     private var connectedPeerId: MCPeerID? {
         get { lock.withLock { _connectedPeerId } }
         set { lock.withLock { _connectedPeerId = newValue } }
@@ -24,10 +27,15 @@ public final class LocalNetworkTransport: NSObject, BattleTransport, @unchecked 
 
     public let events: AsyncStream<BattleTransportEvent>
 
-    public init(displayName: String) {
-        self.myPeerId = MCPeerID(displayName: displayName)
+    public init(peerId: String, displayName: String) {
+        self.myPeerId = MCPeerID(displayName: peerId)
         self.session = MCSession(peer: myPeerId, securityIdentity: nil, encryptionPreference: .required)
-        self.advertiser = MCNearbyServiceAdvertiser(peer: myPeerId, discoveryInfo: nil, serviceType: Self.serviceType)
+        self._displayName = displayName
+        self.advertiser = MCNearbyServiceAdvertiser(
+            peer: myPeerId,
+            discoveryInfo: [Self.displayNameKey: displayName],
+            serviceType: Self.serviceType
+        )
         self.browser = MCNearbyServiceBrowser(peer: myPeerId, serviceType: Self.serviceType)
 
         var cont: AsyncStream<BattleTransportEvent>.Continuation?
@@ -41,6 +49,10 @@ public final class LocalNetworkTransport: NSObject, BattleTransport, @unchecked 
         browser.delegate = self
     }
 
+    public convenience init(displayName: String) {
+        self.init(peerId: displayName, displayName: displayName)
+    }
+
     deinit {
         advertiser.stopAdvertisingPeer()
         browser.stopBrowsingForPeers()
@@ -51,20 +63,43 @@ public final class LocalNetworkTransport: NSObject, BattleTransport, @unchecked 
     // MARK: - BattleTransport
 
     public func startBrowsing() {
+        lock.withLock { _isBrowsing = true }
         advertiser.startAdvertisingPeer()
         browser.startBrowsingForPeers()
     }
 
     public func stopBrowsing() {
+        lock.withLock { _isBrowsing = false }
         advertiser.stopAdvertisingPeer()
         browser.stopBrowsingForPeers()
+    }
+
+    public func updateDisplayName(_ displayName: String) {
+        let shouldRestart = lock.withLock { () -> Bool? in
+            guard _displayName != displayName else { return nil }
+            _displayName = displayName
+            return _isBrowsing
+        }
+        guard let shouldRestart else { return }
+
+        advertiser.stopAdvertisingPeer()
+        let updatedAdvertiser = MCNearbyServiceAdvertiser(
+            peer: myPeerId,
+            discoveryInfo: [Self.displayNameKey: displayName],
+            serviceType: Self.serviceType
+        )
+        updatedAdvertiser.delegate = self
+        advertiser = updatedAdvertiser
+        if shouldRestart {
+            updatedAdvertiser.startAdvertisingPeer()
+        }
     }
 
     public func invite(_ peerId: String) throws {
         guard let peer = session.connectedPeers.first(where: { $0.displayName == peerId })
                       ?? findDiscoveredPeer(named: peerId)
         else { throw TransportError.peerNotFound }
-        browser.invitePeer(peer, to: session, withContext: nil, timeout: 30)
+        browser.invitePeer(peer, to: session, withContext: nil, timeout: BattleTimeout.connectionSeconds)
     }
 
     public func connect(to peerId: String) async throws {
@@ -157,7 +192,8 @@ extension LocalNetworkTransport: MCNearbyServiceBrowserDelegate {
                 _discoveredPeers.append(peerID)
             }
         }
-        emit(.peerFound(peerId: peerID.displayName, peerName: peerID.displayName))
+        let displayName = info?[Self.displayNameKey] ?? peerID.displayName
+        emit(.peerFound(peerId: peerID.displayName, peerName: displayName))
     }
 
     public func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {

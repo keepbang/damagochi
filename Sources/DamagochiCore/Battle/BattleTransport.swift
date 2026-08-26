@@ -41,10 +41,17 @@ public protocol BattleTransport: AnyObject, Sendable {
     func connect(to peerId: String) async throws
     /// 연결 해제
     func disconnect()
+    /// 탐색 화면에 노출할 이름 갱신. 피어 식별자는 변경하지 않는다.
+    func updateDisplayName(_ displayName: String)
     /// 메시지 전송
     func send(_ message: BattleMessage) throws
     /// 이벤트 스트림 (AsyncStream)
     var events: AsyncStream<BattleTransportEvent> { get }
+}
+
+public extension BattleTransport {
+    /// 표시 이름 갱신을 지원하지 않는 전송 구현을 위한 기본 동작.
+    func updateDisplayName(_ displayName: String) {}
 }
 
 // MARK: - Commit-Reveal Helper
@@ -66,7 +73,11 @@ public enum CommitReveal {
 
 public enum BattleTimeout {
     /// 스킬 선택 제한 시간 (초)
-    public static let skillSelectSeconds: TimeInterval = 30
+    public static let skillSelectSeconds: TimeInterval = 10
+    /// 연결 수락 및 프로필 교환 제한 시간 (초)
+    public static let connectionSeconds: TimeInterval = 15
+    /// 스킬 커밋 후 상대 응답 제한 시간 (초)
+    public static let opponentResponseSeconds: TimeInterval = 15
     /// 타임아웃 시 자동 선택: 첫 번째 공격 스킬
     public static func defaultSkillId(for group: MbtiGroup) -> String {
         BattleSkill.skills(for: group).first(where: { $0.isAttack })?.id

@@ -7,6 +7,8 @@ struct PopoverView: View {
     @ObservedObject private var battleVM: BattleViewModel
     @State private var showOnboarding = !UserDefaults.standard.bool(forKey: "onboardingCompleted")
     @State private var statsTooltip: String? = nil
+    @State private var showNameEditor = false
+    @State private var petNameDraft = ""
 
     init(viewModel: PetViewModel, battleViewModel: BattleViewModel) {
         self.viewModel = viewModel
@@ -20,6 +22,13 @@ struct PopoverView: View {
             } else {
                 mainContent
             }
+        }
+        .alert("펫 이름 짓기", isPresented: $showNameEditor) {
+            TextField("이름", text: $petNameDraft)
+            Button("취소", role: .cancel) {}
+            Button("저장") { viewModel.setPetName(petNameDraft) }
+        } message: {
+            Text("이름은 최대 12자까지 입력할 수 있습니다. 비워두면 종족 이름이 표시됩니다.")
         }
     }
 
@@ -179,6 +188,18 @@ struct PopoverView: View {
         HStack {
             Text(viewModel.state.name ?? speciesName)
                 .font(.headline)
+            if viewModel.state.phase == .alive {
+                Button(action: {
+                    petNameDraft = viewModel.state.name ?? ""
+                    showNameEditor = true
+                }) {
+                    Image(systemName: "pencil")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("펫 이름 변경")
+            }
             Spacer()
             if viewModel.state.phase == .alive {
                 Text("Lv.\(viewModel.state.level)")
