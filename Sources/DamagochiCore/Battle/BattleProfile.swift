@@ -26,6 +26,8 @@ public struct BattleProfile: Codable, Sendable, Identifiable {
     public let id: String
     public let petName: String
     public let speciesId: String
+    /// Optional so profiles sent by older app versions remain decodable.
+    public let stage: Stage?
     public let mbtiGroup: MbtiGroup
     public let speciesRarity: Rarity
     public var stats: BattleStats
@@ -36,11 +38,13 @@ public struct BattleProfile: Codable, Sendable, Identifiable {
         speciesId: String,
         mbtiGroup: MbtiGroup,
         speciesRarity: Rarity,
-        stats: BattleStats
+        stats: BattleStats,
+        stage: Stage? = nil
     ) {
         self.id = id
         self.petName = petName
         self.speciesId = speciesId
+        self.stage = stage
         self.mbtiGroup = mbtiGroup
         self.speciesRarity = speciesRarity
         self.stats = stats
@@ -73,7 +77,8 @@ public extension BattleProfile {
             speciesId: speciesId,
             mbtiGroup: species.group,
             speciesRarity: species.rarity,
-            stats: stats
+            stats: stats,
+            stage: state.stage
         )
     }
 

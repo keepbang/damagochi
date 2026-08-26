@@ -107,6 +107,17 @@ final class PetViewModel: ObservableObject {
         save()
     }
 
+    func setPetName(_ name: String) {
+        guard state.phase == .alive else { return }
+
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedName = trimmedName.isEmpty ? nil : String(trimmedName.prefix(12))
+        guard state.name != normalizedName else { return }
+
+        state.name = normalizedName
+        save()
+    }
+
     var statusMessage: String {
         switch state.phase {
         case .egg:
