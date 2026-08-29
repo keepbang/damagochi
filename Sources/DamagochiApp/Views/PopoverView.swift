@@ -153,6 +153,11 @@ struct PopoverView: View {
                 Text(pet.phase == .alive ? "Lv.\(pet.level)" : pet.phase == .egg ? "알" : "사망")
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
+                if let profile = BattleProfile.from(pet) {
+                    Text("A\(profile.stats.atk) D\(profile.stats.def) S\(profile.stats.spd)")
+                        .font(.system(size: 7, design: .monospaced))
+                        .foregroundStyle(.teal)
+                }
             }
             Spacer(minLength: 0)
         }

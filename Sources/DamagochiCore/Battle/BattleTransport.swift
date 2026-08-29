@@ -6,6 +6,8 @@ import CryptoKit
 public enum BattleMessage: Codable, Sendable {
     /// 연결 후 첫 핸드셰이크: 내 배틀 프로필 전송
     case profile(BattleProfile)
+    /// 팀 배틀 핸드셰이크: alive 슬롯 펫(최대 4)의 최소 프로필만 전송
+    case teamProfile(BattleTeamProfile)
     /// 매 턴 스킬 선택 커밋 (commit-reveal: 해시 먼저)
     case skillCommit(hash: String, turn: Int)
     /// 커밋 확인 후 스킬 공개

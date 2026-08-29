@@ -12,6 +12,9 @@ struct InventoryView: View {
             header
             Divider()
 
+            petEquipmentRoster
+            Divider()
+
             if viewModel.state.inventory.isEmpty {
                 emptyState
             } else {
@@ -21,6 +24,38 @@ struct InventoryView: View {
         .onDisappear {
             adjustCtrl.deactivate(viewModel: viewModel)
         }
+    }
+
+    private var petEquipmentRoster: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 5) {
+            ForEach(Array(viewModel.pets.enumerated()), id: \.offset) { index, pet in
+                Button(action: {
+                    adjustCtrl.deactivate(viewModel: viewModel)
+                    viewModel.selectPet(at: index)
+                }) {
+                    let equippedCount = [pet.equippedItems.head, pet.equippedItems.hand, pet.equippedItems.effect].compactMap { $0 }.count
+                    let profile = BattleProfile.from(pet)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text("슬롯 \(index + 1)").font(.system(size: 8, weight: .bold)).foregroundStyle(.secondary)
+                            Text(pet.name ?? pet.species ?? "알").font(.system(size: 10, weight: .semibold)).lineLimit(1)
+                            Spacer(minLength: 0)
+                        }
+                        Text("장비 \(equippedCount)/3 · \(pet.inventory.count)개")
+                            .font(.system(size: 8)).foregroundStyle(.secondary)
+                        if let profile {
+                            Text("ATK \(profile.stats.atk) DEF \(profile.stats.def)")
+                                .font(.system(size: 8, design: .monospaced)).foregroundStyle(.teal)
+                        }
+                    }
+                    .padding(5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(index == viewModel.selectedPetIndex ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(8)
     }
 
     // MARK: - Header

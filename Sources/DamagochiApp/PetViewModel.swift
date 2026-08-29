@@ -877,4 +877,17 @@ final class PetViewModel: ObservableObject {
         refreshSelectedPet()
         return selectedShare
     }
+
+    /// Keeps a battle item attached to the intended roster slot without
+    /// changing the user's currently selected pet.
+    func appendBattleEquipment(_ item: Equipment, recipientPetID: String?) {
+        let recipientIndex = recipientPetID.flatMap { id in
+            roster.pets.firstIndex { ($0.petId ?? $0.machineId) == id }
+        } ?? roster.selectedIndex
+        if recipientIndex == roster.selectedIndex {
+            state.inventory.append(item)
+        } else {
+            roster.pets[recipientIndex].inventory.append(item)
+        }
+    }
 }

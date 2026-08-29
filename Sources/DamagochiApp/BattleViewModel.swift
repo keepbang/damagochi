@@ -37,8 +37,10 @@ final class BattleViewModel: ObservableObject {
     // MARK: - Published
 
     @Published var phase: Phase = .browsing
+    @Published private(set) var mode: BattleMode = .single
     @Published var foundPeers: [FoundPeer] = []
     @Published var battleState: BattleState?
+    @Published var teamBattleState: TeamBattleState?
     @Published var turnPhase: TurnPhase = .selectingSkill
     @Published var lastReward: BattleReward?
     @Published var errorMessage: String?
@@ -145,6 +147,14 @@ final class BattleViewModel: ObservableObject {
         startBrowsing()
     }
 
+    func setMode(_ mode: BattleMode) {
+        guard phase == .browsing, self.mode != mode else { return }
+        self.mode = mode
+        errorMessage = nil
+        stopBrowsing()
+        startBrowsing()
+    }
+
     /// Re-evaluates eligibility and the advertised pet name when the battle UI
     /// observes a pet-state change.
     func syncPetState() {
@@ -222,6 +232,7 @@ final class BattleViewModel: ObservableObject {
         try? transport.send(.forfeit)
         transport.disconnect()
         activePeerId = nil
+        teamBattleState = nil
         phase = .finished(won: false)
         applyReward(won: false)
     }
@@ -233,6 +244,7 @@ final class BattleViewModel: ObservableObject {
         transport.disconnect()
         activePeerId = nil
         battleState = nil
+        teamBattleState = nil
         clearTurnState()
         battlePresentation = nil
         lastReward = nil
@@ -255,8 +267,18 @@ final class BattleViewModel: ObservableObject {
     }
 
     var canBattle: Bool {
-        guard let state = petViewModel?.state else { return false }
-        return BattleProfile.from(state) != nil
+        switch mode {
+        case .single:
+            guard let state = petViewModel?.state else { return false }
+            return BattleProfile.from(state) != nil
+        case .team:
+            return teamProfiles.count >= 2
+        }
+    }
+
+    var teamProfiles: [BattleProfile] {
+        guard let roster = petViewModel?.roster else { return [] }
+        return roster.pets.compactMap(BattleProfile.from)
     }
 
     // MARK: - Event Listener
@@ -340,6 +362,10 @@ final class BattleViewModel: ObservableObject {
     private func handleMessage(_ message: BattleMessage) {
         switch message {
         case .profile(let profile):
+            guard mode == .single else {
+                recoverToBrowsing(message: "상대가 싱글 배틀을 요청했습니다. 같은 모드를 선택해 주세요.", ignoreActivePeer: true)
+                return
+            }
             guard case .connecting = phase,
                   activePeerId != nil,
                   let myState = petViewModel?.state,
@@ -353,6 +379,27 @@ final class BattleViewModel: ObservableObject {
             connectTask?.cancel()
             connectTask = nil
             battleState = BattleState(me: myProfile, opponent: profile)
+            phase = .inBattle
+            turnPhase = .selectingSkill
+            clearTurnState()
+            startSelectionCountdown()
+
+        case .teamProfile(let opponentTeam):
+            guard mode == .team,
+                  case .connecting = phase,
+                  activePeerId != nil,
+                  opponentTeam.members.count >= 2,
+                  let team = TeamBattleState(myTeam: teamProfiles, opponentTeam: opponentTeam.members)
+            else {
+                recoverToBrowsing(message: "팀 배틀 팀 구성이 올바르지 않거나 상대 모드가 다릅니다.", ignoreActivePeer: true)
+                return
+            }
+            connectionTimeoutTask?.cancel()
+            connectionTimeoutTask = nil
+            connectTask?.cancel()
+            connectTask = nil
+            teamBattleState = team
+            battleState = team.activeBattle
             phase = .inBattle
             turnPhase = .selectingSkill
             clearTurnState()
@@ -427,7 +474,13 @@ final class BattleViewModel: ObservableObject {
 
         let myHpBefore = state.myProfile.stats.currentHp
         let opponentHpBefore = state.opponentProfile.stats.currentHp
-        BattleEngine.resolveTurn(state: &state, mySkillId: myId, opponentSkillId: opId)
+        if mode == .team, var team = teamBattleState {
+            team.resolveTurn(mySkillId: myId, opponentSkillId: opId)
+            teamBattleState = team
+            state = team.activeBattle
+        } else {
+            BattleEngine.resolveTurn(state: &state, mySkillId: myId, opponentSkillId: opId)
+        }
         battleState = state
         battlePresentation = BattlePresentation(
             myDamage: max(0, myHpBefore - state.myProfile.stats.currentHp),
@@ -436,8 +489,11 @@ final class BattleViewModel: ObservableObject {
 
         clearTurnState()
 
-        if state.status != .ongoing {
-            let won = state.status == .victory
+        let isTeamFinished = mode == .team && teamBattleState?.status != .ongoing
+        if (mode == .single && state.status != .ongoing) || isTeamFinished {
+            let won = mode == .team
+                ? teamBattleState?.status == .victory
+                : state.status == .victory
             let result = BattleResult(
                 winnerId: won ? state.myProfile.id : state.opponentProfile.id,
                 loserId: won ? state.opponentProfile.id : state.myProfile.id,
@@ -452,7 +508,9 @@ final class BattleViewModel: ObservableObject {
                 guard !Task.isCancelled, let self else { return }
                 guard self.phase == .inBattle,
                       self.battlePresentation?.id == presentationId,
-                      self.battleState?.status != .ongoing
+                      (self.mode == .team
+                        ? self.teamBattleState?.status != .ongoing
+                        : self.battleState?.status != .ongoing)
                 else { return }
                 self.phase = .finished(won: won)
                 self.applyReward(won: won)
@@ -466,14 +524,24 @@ final class BattleViewModel: ObservableObject {
     // MARK: - Profile Exchange
 
     private func sendMyProfile() {
-        guard let myState = petViewModel?.state,
-              let profile = BattleProfile.from(myState)
-        else {
-            recoverToBrowsing(message: "알이 부화한 뒤 배틀할 수 있습니다", ignoreActivePeer: true)
-            return
-        }
         do {
-            try transport.send(.profile(profile))
+            switch mode {
+            case .single:
+                guard let myState = petViewModel?.state,
+                      let profile = BattleProfile.from(myState)
+                else {
+                    recoverToBrowsing(message: "알이 부화한 뒤 배틀할 수 있습니다", ignoreActivePeer: true)
+                    return
+                }
+                try transport.send(.profile(profile))
+            case .team:
+                guard teamProfiles.count >= 2 else {
+                    recoverToBrowsing(message: "팀 배틀에는 생존 펫이 2마리 이상 필요합니다", ignoreActivePeer: true)
+                    return
+                }
+                let teamId = petViewModel?.state.machineId ?? UUID().uuidString
+                try transport.send(.teamProfile(BattleTeamProfile(id: teamId, members: teamProfiles)))
+            }
         } catch {
             recoverToBrowsing(message: "프로필 전송 실패: \(error.localizedDescription)", ignoreActivePeer: true)
         }
@@ -545,6 +613,7 @@ final class BattleViewModel: ObservableObject {
         transport.disconnect()
         activePeerId = nil
         battleState = nil
+        teamBattleState = nil
         battlePresentation = nil
         clearTurnState()
         lastReward = nil
@@ -579,7 +648,7 @@ final class BattleViewModel: ObservableObject {
 
     private func handlePetStateChange(_ state: PetState) {
         transport.updateDisplayName(Self.displayName(for: state))
-        if BattleProfile.from(state) == nil {
+        if !canBattle {
             stopBrowsing()
             if phase != .browsing {
                 recoverToBrowsing(message: "알이 부화한 뒤 배틀할 수 있습니다", ignoreActivePeer: true)
@@ -613,17 +682,21 @@ final class BattleViewModel: ObservableObject {
             allEquipment: allEquip
         )
         lastReward = reward
-        vm.applyBattleReward(reward)
+        let recipientPetID = mode == .team && won ? battleState?.myProfile.id : nil
+        vm.applyBattleReward(reward, recipientPetID: recipientPetID)
     }
 }
 
 // MARK: - PetViewModel 확장
 
 extension PetViewModel {
-    func applyBattleReward(_ reward: BattleReward) {
+    /// XP is always roster-wide. A tournament equipment drop belongs to the
+    /// final surviving combatant, while legacy single battles keep the
+    /// selected-pet behavior by leaving `recipientPetID` empty.
+    func applyBattleReward(_ reward: BattleReward, recipientPetID: String? = nil) {
         _ = awardSharedXP(reward.xpGained)
         if let item = reward.droppedEquipment {
-            state.inventory.append(item)
+            appendBattleEquipment(item, recipientPetID: recipientPetID)
         }
         save()
     }

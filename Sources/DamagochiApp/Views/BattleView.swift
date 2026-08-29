@@ -25,19 +25,31 @@ struct BattleView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 6) {
-            Text("배틀").font(.headline)
-            Spacer()
-            switch battleVM.phase {
-            case .browsing where battleVM.canBattle:
-                statusPill("탐색 중", progress: true)
-            case .connecting:
-                statusPill("연결 중", progress: true)
-            case .inBattle:
-                statusPill("진행 중", progress: false)
-            default:
-                EmptyView()
+        VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                Text("배틀").font(.headline)
+                Spacer()
+                switch battleVM.phase {
+                case .browsing where battleVM.canBattle:
+                    statusPill("탐색 중", progress: true)
+                case .connecting:
+                    statusPill("연결 중", progress: true)
+                case .inBattle:
+                    statusPill("진행 중", progress: false)
+                default:
+                    EmptyView()
+                }
             }
+            Picker("배틀 방식", selection: Binding(
+                get: { battleVM.mode },
+                set: { battleVM.setMode($0) }
+            )) {
+                ForEach(BattleMode.allCases, id: \.self) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(battleVM.phase != .browsing)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -91,6 +103,7 @@ struct BattleView: View {
     }
 
     private var lockTitle: String {
+        if battleVM.mode == .team { return "토너먼트 배틀에는 펫 2마리가 필요해요" }
         switch petVM.state.phase {
         case .egg: return "아직 배틀할 수 없어요"
         case .dead: return "배틀에 참여할 펫이 없어요"
@@ -99,6 +112,7 @@ struct BattleView: View {
     }
 
     private var lockMessage: String {
+        if battleVM.mode == .team { return "부화한 펫을 2마리 이상 보유하면 팀 전체가 순서대로 출전해요." }
         switch petVM.state.phase {
         case .egg: return "알이 부화하면 다른 펫과 배틀할 수 있어요."
         case .dead: return "새로운 펫과 다시 시작하면 배틀이 열려요."
@@ -145,7 +159,20 @@ struct BattleView: View {
 
     @ViewBuilder
     private var myStatsCard: some View {
-        if let profile = BattleProfile.from(petVM.state) {
+        if battleVM.mode == .team {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text("내 팀 · 전원 출전").font(.subheadline.bold())
+                    Spacer()
+                    Text("\(battleVM.teamProfiles.count)마리").font(.caption).foregroundStyle(.secondary)
+                }
+                TeamProfileGrid(profiles: battleVM.teamProfiles, activeID: nil, tint: .teal)
+                Text("펫이 쓰러지면 다음 생존 펫이 자동으로 출전합니다.")
+                    .font(.system(size: 9)).foregroundStyle(.secondary)
+            }
+            .padding(8)
+            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+        } else if let profile = BattleProfile.from(petVM.state) {
             VStack(spacing: 4) {
                 HStack {
                     Text(profile.petName).font(.subheadline.bold()).lineLimit(1)
@@ -193,6 +220,14 @@ struct BattleView: View {
     private func battleView(state: BattleState) -> some View {
         let presentation = battleVM.battlePresentation
         return VStack(spacing: 5) {
+            if let team = battleVM.teamBattleState {
+                HStack(spacing: 6) {
+                    TeamProfileGrid(profiles: team.myTeam, activeID: team.myActiveProfile.id, tint: .teal)
+                    Text("vs").font(.caption.bold()).foregroundStyle(.secondary)
+                    TeamProfileGrid(profiles: team.opponentTeam, activeID: team.opponentActiveProfile.id, tint: .purple)
+                }
+                .padding(.horizontal, 8)
+            }
             BattleArena(
                 myProfile: state.myProfile,
                 opponentProfile: state.opponentProfile,
@@ -347,6 +382,31 @@ struct BattleView: View {
         Text(rarity.shortLabel).font(.system(size: 8).bold()).foregroundStyle(rarity.color)
             .padding(.horizontal, 4).padding(.vertical, 1)
             .background(rarity.color.opacity(0.15), in: Capsule())
+    }
+}
+
+private struct TeamProfileGrid: View {
+    let profiles: [BattleProfile]
+    let activeID: String?
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(profiles) { profile in
+                let isActive = activeID == profile.id
+                let fainted = profile.stats.currentHp <= 0
+                VStack(spacing: 1) {
+                    Text(profile.petName).font(.system(size: 8, weight: isActive ? .bold : .regular)).lineLimit(1)
+                    Text("\(max(0, profile.stats.currentHp))/\(profile.stats.maxHp)")
+                        .font(.system(size: 7, design: .monospaced))
+                }
+                .foregroundStyle(fainted ? .secondary : .primary)
+                .opacity(fainted ? 0.42 : 1)
+                .padding(.horizontal, 4).padding(.vertical, 3)
+                .background(isActive ? tint.opacity(0.22) : Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 4))
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(isActive ? tint : .clear, lineWidth: 1))
+            }
+        }
     }
 }
 

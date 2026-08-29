@@ -202,23 +202,45 @@ struct SettingsView: View {
 
     private var petInfoSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("펫 정보", systemImage: "info.circle.fill")
+            Label("펫별 정보 · 능력치", systemImage: "person.3.fill")
                 .font(.caption.bold())
 
-            infoRow("상태", value: phaseText)
-            if let species = viewModel.state.species {
-                infoRow("종족", value: speciesName(species))
+            ForEach(Array(viewModel.pets.enumerated()), id: \.offset) { index, pet in
+                Button(action: { viewModel.selectPet(at: index) }) {
+                    petInfoCard(pet, index: index)
+                }
+                .buttonStyle(.plain)
             }
-            if let personality = viewModel.state.personality {
-                infoRow("성격", value: personality)
-            }
-            infoRow("단계", value: stageText)
-            infoRow("총 XP", value: "\(viewModel.state.totalXp)")
-            infoRow("연속 근무일", value: "\(viewModel.state.consecutiveWorkdays)일")
-            infoRow("사망 횟수", value: "\(viewModel.state.deathCount)회")
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.3)))
+    }
+
+    private func petInfoCard(_ pet: PetState, index: Int) -> some View {
+        let profile = BattleProfile.from(pet)
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 5) {
+                Text("슬롯 \(index + 1)").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
+                Text(pet.name ?? pet.species.map { speciesName($0) } ?? "알")
+                    .font(.caption.bold()).lineLimit(1)
+                Spacer()
+                Text(pet.phase == .alive ? "Lv.\(pet.level)" : phaseText(for: pet))
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            HStack(spacing: 7) {
+                Text("HP \(pet.hp)")
+                Text("XP \(pet.totalXp)")
+                Text("MBTI \(pet.personality ?? "미확정")")
+            }
+            .font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+            if let profile {
+                Text("ATK \(profile.stats.atk) · INT \(profile.stats.int_) · DEF \(profile.stats.def) · SPD \(profile.stats.spd)")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.teal)
+            }
+        }
+        .padding(6)
+        .background(index == viewModel.selectedPetIndex ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 6))
     }
 
     // MARK: - Release
@@ -391,7 +413,11 @@ struct SettingsView: View {
     }
 
     private var phaseText: String {
-        switch viewModel.state.phase {
+        phaseText(for: viewModel.state)
+    }
+
+    private func phaseText(for pet: PetState) -> String {
+        switch pet.phase {
         case .egg:   return "알"
         case .alive: return "생존"
         case .dead:  return "사망"
