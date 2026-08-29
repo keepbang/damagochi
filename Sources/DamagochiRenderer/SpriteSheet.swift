@@ -19,7 +19,9 @@ public enum SpriteSheet {
         phase: PetPhase,
         direction: SpriteDirection = .front
     ) -> [PixelSprite] {
-        if let species, let expanded = ExpandedSpeciesSprites.frames(species: species, stage: stage, direction: direction) {
+        if let species,
+           (direction != .front || ExpandedSpeciesSprites.generatedFrontSpeciesIDs.contains(species)),
+           let expanded = ExpandedSpeciesSprites.frames(species: species, stage: stage, direction: direction) {
             switch phase {
             case .alive: return expanded
             case .dead: return expanded.map { $0.grayed() }

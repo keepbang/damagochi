@@ -9,11 +9,26 @@ enum ExpandedSpeciesSprites {
     }
 
     static let speciesIDs: Set<String> = [
+        // Legacy front sprites keep their original artwork, while these
+        // profiles supply independent back and side artwork for every one.
+        "owl", "wolf", "crystal", "octopus", "android", "phoenix", "dragon", "sphinx", "robot", "nebula",
+        "butterfly", "cloud", "lotus", "jellyfish", "fox", "unicorn", "mushroom", "fairy", "celestial", "aurora",
+        "turtle", "penguin", "bear", "rock", "cactus", "hedgehog", "parrot", "golem", "elephant", "kraken",
+        "cat", "puppy", "rabbit", "flame", "bat", "scorpion", "fish", "lightning", "moonrabbit", "comet",
         "raven", "otter", "chameleon", "atlas_beetle", "clockwork", "orb", "gryphon", "leviathan", "singularity", "chrono_dragon",
         "deer", "seal", "peach", "luna_moth", "capybara", "mermaid", "pegasus", "moonflower", "seraph", "dream_whale",
         "beaver", "koala", "acorn", "badger", "teapot", "lantern", "mammoth", "bastion", "world_tree", "titan",
         "raccoon", "ferret", "gecko", "skate", "parakeet", "ninja", "wyvern", "thunderbird", "starfox", "void_runner",
     ]
+
+    /// The original forty species have hand-authored front frames in
+    /// SpriteSheet. New catalog species use this full 4-direction sheet.
+    static let generatedFrontSpeciesIDs: Set<String> = speciesIDs.subtracting(Set([
+        "owl", "wolf", "crystal", "octopus", "android", "phoenix", "dragon", "sphinx", "robot", "nebula",
+        "butterfly", "cloud", "lotus", "jellyfish", "fox", "unicorn", "mushroom", "fairy", "celestial", "aurora",
+        "turtle", "penguin", "bear", "rock", "cactus", "hedgehog", "parrot", "golem", "elephant", "kraken",
+        "cat", "puppy", "rabbit", "flame", "bat", "scorpion", "fish", "lightning", "moonrabbit", "comet",
+    ]))
 
     static func frames(species: String, stage: Stage, direction: SpriteDirection) -> [PixelSprite]? {
         guard speciesIDs.contains(species) else { return nil }

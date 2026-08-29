@@ -38,3 +38,14 @@ import DamagochiCore
     #expect(left.pixels != right.pixels)
     #expect(left.pixels != right.mirrored().pixels)
 }
+
+@Test func legacySpeciesAlsoUseIndependentDirectionalArtwork() throws {
+    let front = try #require(SpriteSheet.frames(species: "cat", stage: .stage3, phase: .alive, direction: .front).first)
+    let back = try #require(SpriteSheet.frames(species: "cat", stage: .stage3, phase: .alive, direction: .back).first)
+    let left = try #require(SpriteSheet.frames(species: "cat", stage: .stage3, phase: .alive, direction: .sideLeft).first)
+    let right = try #require(SpriteSheet.frames(species: "cat", stage: .stage3, phase: .alive, direction: .sideRight).first)
+
+    #expect(front.pixels != back.pixels)
+    #expect(left.pixels != right.pixels)
+    #expect(left.pixels != right.mirrored().pixels)
+}
