@@ -39,6 +39,18 @@ import DamagochiCore
     #expect(left.pixels != right.mirrored().pixels)
 }
 
+@Test func expandedCatalogSpeciesHaveFortyDistinctStageThreeSilhouettes() {
+    let fingerprints = Species.allSpecies.dropFirst(40).map { species in
+        SpriteSheet.frames(species: species.id, stage: .stage3, phase: .alive, direction: .front)
+            .first!
+            .pixels
+            .flatMap { $0 }
+            .map { String($0.rawValue, radix: 16) }
+            .joined(separator: ",")
+    }
+    #expect(Set(fingerprints).count == 40)
+}
+
 @Test func legacySpeciesAlsoUseIndependentDirectionalArtwork() throws {
     let front = try #require(SpriteSheet.frames(species: "cat", stage: .stage3, phase: .alive, direction: .front).first)
     let back = try #require(SpriteSheet.frames(species: "cat", stage: .stage3, phase: .alive, direction: .back).first)

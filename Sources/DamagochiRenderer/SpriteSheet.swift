@@ -22,9 +22,12 @@ public enum SpriteSheet {
         if let species,
            (direction != .front || ExpandedSpeciesSprites.generatedFrontSpeciesIDs.contains(species)),
            let expanded = ExpandedSpeciesSprites.frames(species: species, stage: stage, direction: direction) {
+            let requiresGridExpansion = ExpandedSpeciesSprites.generatedFrontSpeciesIDs.contains(species)
             switch phase {
-            case .alive: return expanded
-            case .dead: return expanded.map { $0.grayed() }
+            case .alive:
+                return requiresGridExpansion ? expanded.map { $0.nearestResized(width: spriteGridSize, height: spriteGridSize) } : expanded
+            case .dead:
+                return requiresGridExpansion ? expanded.map { $0.grayed().nearestResized(width: spriteGridSize, height: spriteGridSize) } : expanded.map { $0.grayed() }
             case .egg: break
             }
         }
@@ -250,8 +253,8 @@ public enum SpriteSheet {
             ".##..........##.",
             ".##############.",
             "#bbbbbbbbbbbbbb#",
-            "#bww##bbbb##wwb#",
-            "#bwo##bbbb##owb#",
+            "#bwwww#bb#wwwwb#",
+            "#bwwwo#bb#owwwb#",
             "#bbbb######bbbb#",
             "#bbbbb#oo#bbbbb#",
             ".#bbbbbbbbbbbb#.",
@@ -268,7 +271,7 @@ public enum SpriteSheet {
             ".##..........##.",
             ".##############.",
             "#bbbbbbbbbbbbbb#",
-            "#b####bbbb####b#",
+            "#bwwww####wwwwb#",
             "#bbbbbbbbbbbbbb#",
             "#bbbb######bbbb#",
             "#bbbbb#oo#bbbbb#",
@@ -2354,11 +2357,11 @@ public enum SpriteSheet {
 
     private static let puppyStage3: [PixelSprite] = [
         s(puppyPalette, [
-            "..##........##..",
-            ".#tt#......#tt#.",
-            ".#ttttttttttttt#",
-            "#tttttttttttttt#",
-            "#tbb##tttttt##bt",
+            "...bbbb..bbbb...",
+            "..#bbbb##bbbb#..",
+            ".#bbttttttttbb#.",
+            ".#bbttttttttbb#.",
+            "#bbtt#tttt#ttbb#",
             "#ttttt#wwww#tttt",
             "#ttttwwwwwwwwttt",
             ".#tttttttttttt#.",
@@ -2372,11 +2375,11 @@ public enum SpriteSheet {
             "................",
         ]),
         s(puppyPalette, [
-            "..##........##..",
-            ".#tt#......#tt#.",
-            ".#ttttttttttttt#",
-            "#tttttttttttttt#",
-            "#t####tttttt####",
+            "...bbbb..bbbb...",
+            "..#bbbb##bbbb#..",
+            ".#bbttttttttbb#.",
+            ".#bbttttttttbb#.",
+            "#bbtt#tttt#ttbb#",
             "#ttttt#wwww#tttt",
             "#ttttwwwwwwwwttt",
             ".#tttttttttttt#.",

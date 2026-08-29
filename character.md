@@ -25,7 +25,21 @@
 - 장비 레이어는 항상 `기본 펫 → head/hand → effect` 순서이며, 장비 위치 오프셋도 방향별 렌더링 스케일에 맞춰 적용된다.
 - Stage 1·2·3은 같은 캐릭터 ID를 유지하며 몸통 크기만 성장한다. 도감 프리뷰는 식별이 가장 쉬운 Stage 3로 통일했다.
 
-> 참고: 1~40번은 기존 수제 정면 스프라이트를 24×24 그리드에 맞춰 사용한다. 41~80번은 확장 카탈로그용 방향 시트로 렌더링한다. 두 경우 모두 이 문서의 프리뷰가 현재 앱 출력값이다.
+> 참고: 1~40번은 기존 수제 정면 스프라이트를 유지하고, 41~80번은 같은 16×16 원화 규격에서 종별 실루엣을 직접 그린다. 두 경우 모두 이 문서의 프리뷰가 현재 앱 출력값이다.
+
+프리뷰는 아래 명령으로 런타임 `SpriteSheet` 출력에서 다시 만들 수 있다.
+
+```bash
+swift run damagochi-sprite-catalog
+```
+
+확장 40종의 정면·후면·좌측·우측 프리뷰는 다음 명령으로 별도 생성한다.
+
+```bash
+swift run damagochi-sprite-catalog --directions
+```
+
+![확장 40종 방향별 실제 스프라이트](./docs/assets/expanded-character-directions.png)
 
 ## NT — 분석형 / Theoretical
 
@@ -41,16 +55,16 @@
 | 8 | 스핑크스 | sphinx / `sphinx` | legendary | 황토색 석상형 몸과 흰 눈 |
 | 9 | 로봇 | robot / `robot` | mythic | 청회색 기계 몸, 노랑 상태등 |
 | 10 | 성운 | nebula / `nebula` | mythic | 보라·하늘색 가로 줄무늬 구름 |
-| 41 | 큰까마귀 | Raven / `raven` | common | 청록 머리와 연두 몸통의 각진 시트 |
-| 42 | 수달 | Otter / `otter` | common | 주황 머리와 연두 몸통 |
-| 43 | 카멜레온 | Chameleon / `chameleon` | common | 연두 머리·몸, 작은 측면 돌기 |
-| 44 | 장수풍뎅이 | Atlas Beetle / `atlas_beetle` | rare | 분홍 머리와 민트 몸, 촉각 점 |
-| 45 | 태엽 인형 | Clockwork Doll / `clockwork` | rare | 연두 머리와 코랄 몸, 양쪽 점 장식 |
-| 46 | 지식의 구체 | Knowledge Orb / `orb` | rare | 갈색 머리와 코랄 몸, 작은 흰 중심점 |
-| 47 | 그리폰 | Gryphon / `gryphon` | legendary | 보라 머리와 파란 몸, 분홍 중심점 |
-| 48 | 레비아탄 | Leviathan / `leviathan` | legendary | 연두 머리와 청록 몸, 날개형 측면 돌기 |
-| 49 | 특이점 | Singularity / `singularity` | mythic | 파란 머리와 갈색 몸통, 작은 측면 돌기 |
-| 50 | 시간용 | Chrono Dragon / `chrono_dragon` | mythic | 민트 머리와 초록 몸, 촉각 점 |
+| 41 | 큰까마귀 | Raven / `raven` | common | 검은 부리·접힌 날개와 두 다리가 보이는 새 실루엣 |
+| 42 | 수달 | Otter / `otter` | common | 긴 갈색 몸, 작은 귀와 뒤로 빠지는 짙은 꼬리 |
+| 43 | 카멜레온 | Chameleon / `chameleon` | common | 돌출한 눈, 초록 몸과 말린 꼬리 |
+| 44 | 장수풍뎅이 | Atlas Beetle / `atlas_beetle` | rare | 푸른 등딱지의 중앙선·뿔·여섯 다리 |
+| 45 | 태엽 인형 | Clockwork Doll / `clockwork` | rare | 나무 몸, 태엽 축과 관절 다리 |
+| 46 | 지식의 구체 | Knowledge Orb / `orb` | rare | 보랏빛 구체를 감싼 금색 고리와 중심 광점 |
+| 47 | 그리폰 | Gryphon / `gryphon` | legendary | 독수리 머리·부리, 금빛 날개와 사자형 다리 |
+| 48 | 레비아탄 | Leviathan / `leviathan` | legendary | 청록 바다뱀 몸, 뿔·지느러미와 꼬리 |
+| 49 | 특이점 | Singularity / `singularity` | mythic | 검은 중심을 감싼 보라색 중력 고리 |
+| 50 | 시간용 | Chrono Dragon / `chrono_dragon` | mythic | 뿔·날개·꼬리를 갖춘 푸른 시간 용 |
 
 ## NF — 이상형 / Creative
 
@@ -66,16 +80,16 @@
 | 18 | 요정 | fairy / `fairy` | legendary | 분홍 몸, 노랑 왕관과 날개 |
 | 19 | 천상 | celestial / `celestial` | mythic | 금색 별·십자 모양 광원 |
 | 20 | 오로라 | aurora / `aurora` | mythic | 청록·보라·하늘색 띠 |
-| 51 | 사슴 | Deer / `deer` | common | 코랄 머리와 라벤더 몸통 |
-| 52 | 물개 | Seal / `seal` | common | 연두 머리와 갈색 몸통, 촉각 점 |
-| 53 | 복숭아 | Peach / `peach` | common | 파란 머리와 민트 몸통, 작은 측면 돌기 |
-| 54 | 달나방 | Luna Moth / `luna_moth` | rare | 파란 머리·분홍 몸, 하늘색 날개형 돌기 |
-| 55 | 카피바라 | Capybara / `capybara` | rare | 노랑 머리와 갈색 몸통, 측면 손 |
-| 56 | 인어 | Mermaid / `mermaid` | rare | 분홍 머리와 민트 몸, 흰 중심점 |
-| 57 | 페가수스 | Pegasus / `pegasus` | legendary | 보라 머리와 청록 몸, 촉각 점 |
-| 58 | 달꽃 | Moonflower / `moonflower` | legendary | 연두 머리와 황토 몸, 양쪽 잎사귀 돌기 |
-| 59 | 세라프 | Seraph / `seraph` | mythic | 보라 머리와 초록 몸, 촉각 점 |
-| 60 | 꿈고래 | Dream Whale / `dream_whale` | mythic | 민트 머리와 분홍 몸, 민트 중심점 |
+| 51 | 사슴 | Deer / `deer` | common | 갈색 뿔, 밝은 주둥이와 가는 네 다리 |
+| 52 | 물개 | Seal / `seal` | common | 둥근 회색 몸, 흰 배와 양쪽 물갈퀴 |
+| 53 | 복숭아 | Peach / `peach` | common | 분홍 열매의 세로 골과 초록 잎 |
+| 54 | 달나방 | Luna Moth / `luna_moth` | rare | 넓게 펼친 연두 날개와 보라 무늬 |
+| 55 | 카피바라 | Capybara / `capybara` | rare | 넓고 낮은 갈색 몸, 긴 주둥이와 짧은 다리 |
+| 56 | 인어 | Mermaid / `mermaid` | rare | 분홍 머리와 청록색 물고기 꼬리 |
+| 57 | 페가수스 | Pegasus / `pegasus` | legendary | 흰 날개·갈기와 황금 뿔 |
+| 58 | 달꽃 | Moonflower / `moonflower` | legendary | 보랏빛 꽃잎, 금빛 중심과 초록 줄기 |
+| 59 | 세라프 | Seraph / `seraph` | mythic | 후광과 대칭의 흰 날개 |
+| 60 | 꿈고래 | Dream Whale / `dream_whale` | mythic | 파란 고래 몸, 옆지느러미·꼬리와 물기둥 |
 
 ## SJ — 전통형 / Responsible
 
@@ -91,16 +105,16 @@
 | 28 | 골렘 | golem / `golem` | legendary | 회색 기계형 몸과 작은 눈 |
 | 29 | 코끼리 | elephant / `elephant` | mythic | 큰 회색 얼굴, 귀·코 실루엣 |
 | 30 | 크라켄 | kraken / `kraken` | mythic | 하늘색 촉수형 몸과 흰 머리띠 |
-| 61 | 비버 | Beaver / `beaver` | common | 보라 머리와 갈색 몸, 흰 중심점 |
-| 62 | 코알라 | Koala / `koala` | common | 분홍 머리와 황토 몸, 흰 중심점 |
-| 63 | 도토리 | Acorn / `acorn` | common | 파란 머리와 민트 몸, 촉각 점 |
-| 64 | 오소리 | Badger / `badger` | rare | 황토 머리와 민트 몸, 측면 손 |
-| 65 | 찻주전자 | Teapot / `teapot` | rare | 주황 머리와 갈색 몸, 측면 손 |
-| 66 | 등불 | Lantern / `lantern` | rare | 주황 머리와 청록 몸, 촉각 점 |
-| 67 | 매머드 | Mammoth / `mammoth` | legendary | 초록 머리와 코랄 몸, 초록 측면 돌기 |
-| 68 | 요새 | Bastion / `bastion` | legendary | 민트 머리와 연두 몸, 민트 중심점 |
-| 69 | 세계수 | World Tree / `world_tree` | mythic | 청록 머리와 분홍 몸, 하늘색 양측 돌기 |
-| 70 | 타이탄 | Titan / `titan` | mythic | 갈색 머리와 보라 몸, 흰 중심점 |
+| 61 | 비버 | Beaver / `beaver` | common | 갈색 몸, 큰 앞니와 납작한 꼬리 |
+| 62 | 코알라 | Koala / `koala` | common | 큰 회색 귀와 검은 타원 코 |
+| 63 | 도토리 | Acorn / `acorn` | common | 갈색 열매와 톱니 모양 모자·꼭지 |
+| 64 | 오소리 | Badger / `badger` | rare | 검회색 몸을 가르는 흰 얼굴 마스크 |
+| 65 | 찻주전자 | Teapot / `teapot` | rare | 뚜껑·주둥이·손잡이가 모두 드러나는 청록 주전자 |
+| 66 | 등불 | Lantern / `lantern` | rare | 상단 고리와 갈색 테두리 안의 노란 불빛 |
+| 67 | 매머드 | Mammoth / `mammoth` | legendary | 큰 귀·긴 코와 양쪽 상아 |
+| 68 | 요새 | Bastion / `bastion` | legendary | 성벽의 톱니와 중앙 성문 |
+| 69 | 세계수 | World Tree / `world_tree` | mythic | 넓은 초록 수관과 갈색 줄기·뿌리 |
+| 70 | 타이탄 | Titan / `titan` | mythic | 거대한 돌 몸과 양쪽 블록 팔 |
 
 ## SP — 모험형 / Free
 
@@ -116,16 +130,16 @@
 | 38 | 번개 | lightning / `lightning` | legendary | 노랑 번개 지그재그 |
 | 39 | 달토끼 | moonrabbit / `moonrabbit` | mythic | 흰 긴 귀와 검정 외곽선 |
 | 40 | 혜성 | comet / `comet` | mythic | 하늘색 혜성 몸과 흰 꼬리 |
-| 71 | 너구리 | Raccoon / `raccoon` | common | 연두 머리와 코랄 몸, 흰 중심점 |
-| 72 | 페럿 | Ferret / `ferret` | common | 코랄 머리와 라벤더 몸, 측면 손 |
-| 73 | 도마뱀 | Gecko / `gecko` | common | 보라 머리와 분홍 몸, 분홍 중심점 |
-| 74 | 가오리 | Skate / `skate` | rare | 청록 머리와 청록 몸, 흰 중심점 |
-| 75 | 앵무새 | Parakeet / `parakeet` | rare | 초록 머리와 갈색 몸, 초록 측면 돌기 |
-| 76 | 닌자 | Ninja / `ninja` | rare | 보라 머리와 노랑 몸, 촉각 점 |
-| 77 | 와이번 | Wyvern / `wyvern` | legendary | 보라 머리와 갈색 몸, 촉각 점 |
-| 78 | 썬더버드 | Thunderbird / `thunderbird` | legendary | 보라 머리와 분홍 몸, 촉각 점 |
-| 79 | 별여우 | Star Fox / `starfox` | mythic | 보라 머리와 민트 몸, 촉각 점 |
-| 80 | 공허 질주자 | Void Runner / `void_runner` | mythic | 주황 머리와 초록 몸, 촉각 점 |
+| 71 | 너구리 | Raccoon / `raccoon` | common | 눈가의 검은 마스크와 줄무늬 꼬리 |
+| 72 | 페럿 | Ferret / `ferret` | common | 길고 낮은 크림색 몸과 가는 꼬리 |
+| 73 | 도마뱀 | Gecko / `gecko` | common | 넓은 발가락, 돌출한 눈과 긴 꼬리 |
+| 74 | 가오리 | Skate / `skate` | rare | 마름모 날개와 아래로 늘어진 꼬리 |
+| 75 | 앵무새 | Parakeet / `parakeet` | rare | 초록 깃털, 산호색 부리와 긴 꼬리깃 |
+| 76 | 닌자 | Ninja / `ninja` | rare | 보랏빛 머리띠와 눈만 드러난 검은 복면 |
+| 77 | 와이번 | Wyvern / `wyvern` | legendary | 보라 날개·뿔과 긴 용 꼬리 |
+| 78 | 썬더버드 | Thunderbird / `thunderbird` | legendary | 파란 날개, 노란 부리와 번개 볏 |
+| 79 | 별여우 | Star Fox / `starfox` | mythic | 뾰족한 주황 귀, 흰 주둥이와 별 꼬리 |
+| 80 | 공허 질주자 | Void Runner / `void_runner` | mythic | 보랏빛 망토·뿔과 청록색 바이저 |
 
 ## 데이터 호환성 및 갱신 방법
 

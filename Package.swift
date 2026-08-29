@@ -10,6 +10,7 @@ let package = Package(
     products: [
         .executable(name: "DamagochiApp", targets: ["DamagochiApp"]),
         .executable(name: "damagochi", targets: ["DamagochiCLI"]),
+        .executable(name: "damagochi-sprite-catalog", targets: ["DamagochiSpriteCatalog"]),
         .library(name: "DamagochiCore", targets: ["DamagochiCore"]),
     ],
     dependencies: [
@@ -55,6 +56,10 @@ let package = Package(
                 "DamagochiCore",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
+        ),
+        .executableTarget(
+            name: "DamagochiSpriteCatalog",
+            dependencies: ["DamagochiCore", "DamagochiRenderer"]
         ),
         .testTarget(
             name: "DamagochiCoreTests",
