@@ -8,10 +8,11 @@ struct EquippedPetView: View {
     @ObservedObject var viewModel: PetViewModel
     let scale: CGFloat
     let interval: TimeInterval
+    var direction: SpriteDirection = .front
     var highlightedSlot: EquipmentSlot? = nil
 
     var body: some View {
-        let baseFrames = viewModel.baseFrames
+        let baseFrames = viewModel.baseFrames(direction: direction)
         let baseWidth = CGFloat(baseFrames.first?.width ?? 16) * scale
         let baseHeight = CGFloat(baseFrames.first?.height ?? 16) * scale
         let overlays = viewModel.equippedOverlays
@@ -74,7 +75,10 @@ private struct StaticEquipmentOverlay: View {
                     )
                     .allowsHitTesting(false)
             )
-            .offset(x: CGFloat(off.x) * scale, y: CGFloat(off.y) * scale)
+            .offset(
+                x: CGFloat(off.x) * scale * SpriteSheet.gridScale,
+                y: CGFloat(off.y) * scale * SpriteSheet.gridScale
+            )
             .allowsHitTesting(false)
     }
 }

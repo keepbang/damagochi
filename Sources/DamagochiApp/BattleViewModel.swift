@@ -621,8 +621,7 @@ final class BattleViewModel: ObservableObject {
 
 extension PetViewModel {
     func applyBattleReward(_ reward: BattleReward) {
-        state.xp += reward.xpGained
-        state.totalXp += reward.xpGained
+        _ = awardSharedXP(reward.xpGained)
         if let item = reward.droppedEquipment {
             state.inventory.append(item)
         }

@@ -59,7 +59,11 @@ public struct FeedProcessor: Sendable {
     }
 
     @discardableResult
-    public func process(event: BehaviorEvent, state: inout PetState) -> FeedResult {
+    public func process(
+        event: BehaviorEvent,
+        state: inout PetState,
+        xpOverride: Int? = nil
+    ) -> FeedResult {
         if case .stop = event.kind { return FeedResult() }
         if case .notification = event.kind { return FeedResult() }
 
@@ -75,7 +79,7 @@ public struct FeedProcessor: Sendable {
             }
         }
 
-        let xp = xpEngine.xpForEvent(event, streakDays: state.streakDays)
+        let xp = xpOverride ?? xpEngine.xpForEvent(event, streakDays: state.streakDays)
         state.totalXp += xp
         if state.phase != .egg {
             state.xp += xp

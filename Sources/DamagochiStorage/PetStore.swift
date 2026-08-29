@@ -15,6 +15,7 @@ public enum MigrationError: LocalizedError {
 
 public final class PetStore: Sendable {
     private static let stateKey = "com.damagochi.petState"
+    private static let rosterKey = "com.damagochi.petRoster"
 
     public init() {}
 
@@ -28,21 +29,45 @@ public final class PetStore: Sendable {
         UserDefaults.standard.set(data, forKey: Self.stateKey)
     }
 
+    /// Loads the new multi-pet payload and falls back to the legacy single
+    /// `PetState` key. The fallback is intentionally non-destructive so an
+    /// interrupted upgrade can still recover its old save.
+    public func loadRoster() -> PetRoster? {
+        if let data = UserDefaults.standard.data(forKey: Self.rosterKey),
+           let roster = try? JSONDecoder().decode(PetRoster.self, from: data) {
+            return roster
+        }
+        return load().map(PetRoster.init(legacy:))
+    }
+
+    public func save(_ roster: PetRoster) {
+        guard let data = try? JSONEncoder().encode(roster) else { return }
+        UserDefaults.standard.set(data, forKey: Self.rosterKey)
+    }
+
     public func reset() {
         UserDefaults.standard.removeObject(forKey: Self.stateKey)
+        UserDefaults.standard.removeObject(forKey: Self.rosterKey)
     }
 
     public func export(to url: URL) throws {
-        guard let state = load() else { throw MigrationError.noData }
+        guard let roster = loadRoster() else { throw MigrationError.noData }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(state)
+        let data = try encoder.encode(roster)
         try data.write(to: url, options: .atomic)
     }
 
-    public func importState(from url: URL) throws -> PetState {
+    public func importRoster(from url: URL) throws -> PetRoster {
         let data = try Data(contentsOf: url)
-        guard let state = try? JSONDecoder().decode(PetState.self, from: data) else {
+        if let roster = try? JSONDecoder().decode(PetRoster.self, from: data) { return roster }
+        if let state = try? JSONDecoder().decode(PetState.self, from: data) { return PetRoster(legacy: state) }
+        throw MigrationError.invalidFile
+    }
+
+    /// Compatibility API used by older callers and exported single-pet files.
+    public func importState(from url: URL) throws -> PetState {
+        guard let state = try importRoster(from: url).selectedPet else {
             throw MigrationError.invalidFile
         }
         return state

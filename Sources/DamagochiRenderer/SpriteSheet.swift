@@ -1,19 +1,52 @@
 import DamagochiCore
 
+public enum SpriteDirection: String, Codable, Sendable, CaseIterable {
+    case front
+    case back
+    case sideLeft
+    case sideRight
+}
+
 public enum SpriteSheet {
+    /// The runtime sheet is 24×24. `gridScale` preserves the original on-screen
+    /// footprint when a caller lowers its point scale from legacy 16×16 art.
+    public static let spriteGridSize = 24
+    public static let gridScale = 1.5
 
     public static func frames(
         species: String?,
         stage: Stage,
-        phase: PetPhase
+        phase: PetPhase,
+        direction: SpriteDirection = .front
     ) -> [PixelSprite] {
+        if let species, let expanded = ExpandedSpeciesSprites.frames(species: species, stage: stage, direction: direction) {
+            switch phase {
+            case .alive: return expanded
+            case .dead: return expanded.map { $0.grayed() }
+            case .egg: break
+            }
+        }
+        let base: [PixelSprite]
         switch phase {
         case .egg:
-            return eggFrames
+            base = eggFrames
         case .dead:
-            return aliveFrames(species: species, stage: stage).map { $0.grayed() }
+            base = aliveFrames(species: species, stage: stage).map { $0.grayed() }
         case .alive:
-            return aliveFrames(species: species, stage: stage)
+            base = aliveFrames(species: species, stage: stage)
+        }
+        // The original sheets were front-only. Direction is a first-class API
+        // now, with mirrored side frames as a safe compatibility fallback until
+        // a species provides bespoke asymmetric artwork.
+        let directional: [PixelSprite]
+        switch direction {
+        case .front, .back, .sideRight:
+            directional = base
+        case .sideLeft:
+            directional = base.map { $0.mirrored() }
+        }
+        return directional.map {
+            $0.nearestResized(width: spriteGridSize, height: spriteGridSize)
         }
     }
 
@@ -5352,15 +5385,19 @@ public enum SpriteSheet {
     ) -> [EquippedOverlay] {
         var result: [EquippedOverlay] = []
         if let id = equipped.head, let item = inventory.first(where: { $0.id == id }) {
-            result.append(EquippedOverlay(slot: .head, item: item, sprite: headOverlay(item: item)))
+            result.append(EquippedOverlay(slot: .head, item: item, sprite: normalizedOverlay(headOverlay(item: item))))
         }
         if let id = equipped.hand, let item = inventory.first(where: { $0.id == id }) {
-            result.append(EquippedOverlay(slot: .hand, item: item, sprite: handOverlay(item: item)))
+            result.append(EquippedOverlay(slot: .hand, item: item, sprite: normalizedOverlay(handOverlay(item: item))))
         }
         if let id = equipped.effect, let item = inventory.first(where: { $0.id == id }) {
-            result.append(EquippedOverlay(slot: .effect, item: item, sprite: effectOverlay(item: item)))
+            result.append(EquippedOverlay(slot: .effect, item: item, sprite: normalizedOverlay(effectOverlay(item: item))))
         }
         return result
+    }
+
+    private static func normalizedOverlay(_ sprite: PixelSprite) -> PixelSprite {
+        sprite.nearestResized(width: spriteGridSize, height: spriteGridSize)
     }
 
     public static func frames(
@@ -5379,7 +5416,7 @@ public enum SpriteSheet {
     }
 
     private static func headOverlay(item: Equipment) -> PixelSprite {
-        switch item.id {
+        switch item.spriteId {
         case "head_common_1":    return headCodingCap
         case "head_common_2":    return headBaseballCap
         case "head_common_3":    return headBeanie
@@ -5401,7 +5438,7 @@ public enum SpriteSheet {
     }
 
     private static func handOverlay(item: Equipment) -> PixelSprite {
-        switch item.id {
+        switch item.spriteId {
         case "hand_common_1":    return handWoodStaff
         case "hand_common_2":    return handSmallShield
         case "hand_common_3":    return handLaptop
@@ -5423,7 +5460,7 @@ public enum SpriteSheet {
     }
 
     private static func effectOverlay(item: Equipment) -> PixelSprite {
-        switch item.id {
+        switch item.spriteId {
         case "effect_common_1":    return effectSparkle
         case "effect_common_2":    return effectBubbles
         case "effect_common_3":    return effectLeaves

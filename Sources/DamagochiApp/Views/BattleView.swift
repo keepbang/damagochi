@@ -74,7 +74,7 @@ struct BattleView: View {
     private var battleLockedView: some View {
         VStack(spacing: 12) {
             Spacer()
-            AnimatedPetView(frames: petVM.baseFrames, scale: 5, interval: 0.55)
+            AnimatedPetView(frames: petVM.baseFrames, scale: 10.0 / 3.0, interval: 0.55)
                 .accessibilityHidden(true)
             VStack(spacing: 5) {
                 Text(lockTitle).font(.headline)
@@ -430,6 +430,11 @@ private struct CombatantHUD: View {
                 Text(profile.petName).font(.system(size: 10, weight: .bold)).lineLimit(1)
                 Text(profile.speciesRarity.shortLabel).font(.system(size: 7, weight: .bold))
                     .foregroundStyle(profile.speciesRarity.color)
+                if let battleLevel = profile.battleLevel {
+                    Text("Lv.\(battleLevel)")
+                        .font(.system(size: 7, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.72))
+                }
                 Spacer(minLength: 0)
                 Text("\(profile.stats.currentHp)/\(profile.stats.maxHp)")
                     .font(.system(size: 8, design: .monospaced)).foregroundStyle(.white.opacity(0.78))
@@ -470,11 +475,15 @@ private struct BattlePetSprite: View {
     var body: some View {
         ZStack(alignment: .top) {
             ImpactEffect(scale: effectScale, opacity: effectOpacity, healing: shownDamage < 0)
-            AnimatedPetView(frames: SpriteSheet.frames(species: profile.speciesId,
-                                                       stage: profile.stage ?? .stage1,
-                                                       phase: .alive),
-                            scale: 3.25, interval: 0.45)
-                .offset(x: shake).brightness(flash ? 0.7 : 0)
+            ZStack {
+                AnimatedPetView(frames: SpriteSheet.frames(species: profile.speciesId,
+                                                           stage: profile.stage ?? .stage1,
+                                                           phase: .alive,
+                                                           direction: direction < 0 ? .back : .front),
+                                scale: 13.0 / 6.0, interval: 0.45)
+                BattleEquipmentOverlays(profile: profile, scale: 13.0 / 6.0)
+            }
+            .offset(x: shake).brightness(flash ? 0.7 : 0)
             if labelOpacity > 0 {
                 Text(shownDamage < 0 ? "+\(abs(shownDamage))" : "-\(shownDamage)")
                     .font(.system(size: 12, weight: .heavy, design: .rounded))
@@ -510,6 +519,29 @@ private struct BattlePetSprite: View {
         try? await Task.sleep(for: .milliseconds(70)); guard !Task.isCancelled else { return }
         withAnimation(.easeOut(duration: 0.2)) {
             shake = 0; effectScale = 1.7; effectOpacity = 0; labelOffset = -14; labelOpacity = 0
+        }
+    }
+}
+
+private struct BattleEquipmentOverlays: View {
+    let profile: BattleProfile
+    let scale: CGFloat
+
+    var body: some View {
+        let overlays = SpriteSheet.equippedOverlays(
+            equipped: profile.equippedItems ?? EquippedItems(),
+            inventory: profile.equippedEquipment ?? EquipmentDropper.itemPool
+        )
+        let offsets = profile.equipmentOffsets ?? EquipmentOffsets()
+        ZStack {
+            ForEach(overlays, id: \.slot) { overlay in
+                PixelArtView(sprite: overlay.sprite, scale: scale)
+                    .offset(
+                        x: CGFloat(offsets.offset(for: overlay.slot).x) * scale * SpriteSheet.gridScale,
+                        y: CGFloat(offsets.offset(for: overlay.slot).y) * scale * SpriteSheet.gridScale
+                    )
+                    .allowsHitTesting(false)
+            }
         }
     }
 }

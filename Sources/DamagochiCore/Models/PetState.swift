@@ -104,6 +104,10 @@ public struct ActivityStats: Codable, Sendable, Equatable {
 }
 
 public struct PetState: Codable, Sendable {
+    /// Stable identity for this individual pet. The machine identifier remains
+    /// shared by all slots on one device; this ID keeps roster slots distinct
+    /// in battle snapshots.
+    public var petId: String?
     public var machineId: String
     public var phase: PetPhase
     public var species: String?
@@ -178,6 +182,7 @@ public struct PetState: Codable, Sendable {
     }
 
     public init(machineId: String) {
+        self.petId = UUID().uuidString
         self.machineId = machineId
         self.phase = .egg
         self.species = nil
@@ -212,5 +217,97 @@ public struct PetState: Codable, Sendable {
         self.goldenBugsCaught = 0
         self.rainbowBugsCaught = 0
         self.activeBugs = []
+    }
+}
+
+/// Persisted owner-level state. `PetState` remains the unit used by the core
+/// game engines, while this roster owns slot selection and cross-pet rewards.
+/// Keeping the two types separate makes legacy single-pet JSON trivially
+/// migratable and avoids coupling battle/evolution code to UI slot concerns.
+public struct PetRoster: Codable, Sendable {
+    public static let maximumPets = 4
+
+    public var pets: [PetState]
+    public var selectedIndex: Int
+    /// Rotates integer XP remainders so the lowest slot is not always favored.
+    public var xpRemainderCursor: Int
+    /// Owner-level history copied from legacy state during migration. Existing
+    /// per-pet values are retained for backward compatibility with old views.
+    public var globalUnlockedAchievements: [String]
+    public var globalGraveyardEntries: [GraveyardEntry]
+
+    public init(
+        pets: [PetState],
+        selectedIndex: Int = 0,
+        xpRemainderCursor: Int = 0,
+        globalUnlockedAchievements: [String] = [],
+        globalGraveyardEntries: [GraveyardEntry] = []
+    ) {
+        self.pets = Array(pets.prefix(Self.maximumPets))
+        self.selectedIndex = min(max(0, selectedIndex), max(0, self.pets.count - 1))
+        self.xpRemainderCursor = max(0, xpRemainderCursor)
+        self.globalUnlockedAchievements = globalUnlockedAchievements
+        self.globalGraveyardEntries = globalGraveyardEntries
+    }
+
+    public init(legacy state: PetState) {
+        self.init(
+            pets: [state],
+            globalUnlockedAchievements: state.unlockedAchievements,
+            globalGraveyardEntries: state.graveyardEntries
+        )
+    }
+
+    public var selectedPet: PetState? {
+        guard pets.indices.contains(selectedIndex) else { return nil }
+        return pets[selectedIndex]
+    }
+
+    public var eligibleXPIndices: [Int] {
+        pets.indices.filter { pets[$0].phase == .egg || pets[$0].phase == .alive }
+    }
+
+    public var walkableIndices: [Int] {
+        pets.indices.filter { pets[$0].phase == .alive && pets[$0].stage != .stage1 }
+    }
+
+    public var canAddPet: Bool { pets.count < Self.maximumPets }
+
+    /// Returns a deterministic, fair integer split and advances the remainder
+    /// cursor. The sum of all returned shares always equals `totalXP`.
+    public mutating func distributeXP(_ totalXP: Int) -> [Int: Int] {
+        guard totalXP > 0 else { return [:] }
+        let recipients = eligibleXPIndices
+        guard !recipients.isEmpty else { return [:] }
+
+        let base = totalXP / recipients.count
+        let remainder = totalXP % recipients.count
+        var shares = Dictionary(uniqueKeysWithValues: recipients.map { ($0, base) })
+        let start = xpRemainderCursor % recipients.count
+        for offset in 0..<remainder {
+            let index = recipients[(start + offset) % recipients.count]
+            shares[index, default: 0] += 1
+        }
+        xpRemainderCursor = (start + remainder) % recipients.count
+        return shares
+    }
+
+    public mutating func replaceSelectedPet(with pet: PetState) {
+        guard pets.indices.contains(selectedIndex) else { return }
+        pets[selectedIndex] = pet
+        syncGlobalHistory(from: pet)
+    }
+
+    public mutating func addPet(machineId: String) -> Bool {
+        guard canAddPet else { return false }
+        pets.append(PetState(machineId: machineId))
+        selectedIndex = pets.count - 1
+        return true
+    }
+
+    public mutating func syncGlobalHistory(from pet: PetState) {
+        globalUnlockedAchievements = Array(Set(globalUnlockedAchievements + pet.unlockedAchievements)).sorted()
+        let knownIds = Set(globalGraveyardEntries.map(\.id))
+        globalGraveyardEntries += pet.graveyardEntries.filter { !knownIds.contains($0.id) }
     }
 }

@@ -17,7 +17,7 @@ final class WalkingWindowController {
         let hostingController = NSHostingController(rootView: WalkingPetView(viewModel: viewModel))
 
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 160, height: 180),
+            contentRect: NSRect(x: 0, y: 0, width: 680, height: 740),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -34,7 +34,7 @@ final class WalkingWindowController {
         if let screen = NSScreen.main {
             let f = screen.visibleFrame
             let s = panel.frame.size
-            panel.setFrameOrigin(NSPoint(x: f.maxX - s.width - 24, y: f.minY + 120))
+            panel.setFrameOrigin(NSPoint(x: f.maxX - s.width - 24, y: max(f.minY + 24, f.maxY - s.height - 24)))
         }
 
         panel.orderFront(nil)

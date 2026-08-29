@@ -9,21 +9,43 @@ public struct PersonalityTracker: Sendable {
             if let interval = event.metadata?["sessionInterval"],
                let minutes = Double(interval) {
                 scores.extroversion += minutes < 30 ? 1 : -1
+            } else {
+                // Hooks do not always provide an interval. Counting a session
+                // as lightweight E evidence prevents E/I from being frozen at
+                // its default value for an entire pet lifecycle.
+                scores.extroversion += 1
+            }
+            if let hour = event.metadata?["hour"], let value = Int(hour) {
+                scores.judging += (value >= 9 && value < 18) ? 1 : -1
             }
         case .toolUse:
             if let tool = event.metadata?["tool"] {
-                let analyticTools: Set<String> = ["Grep", "Read", "Glob", "LSP"]
-                let creativeTools: Set<String> = ["Edit", "Write"]
-                if analyticTools.contains(tool) {
+                let normalizedTool = tool.lowercased()
+                let analyticTools: Set<String> = ["grep", "read", "glob", "lsp", "search"]
+                let creativeTools: Set<String> = ["edit", "write", "apply_patch"]
+                let exploratoryTools: Set<String> = ["webfetch", "websearch", "task", "agent", "bash", "terminal"]
+                if analyticTools.contains(normalizedTool) {
                     scores.thinking += 1
-                } else if creativeTools.contains(tool) {
+                    scores.intuition += 1
+                } else if creativeTools.contains(normalizedTool) {
                     scores.thinking -= 1
+                    scores.intuition -= 1
+                } else if exploratoryTools.contains(normalizedTool) {
+                    scores.intuition += 1
                 }
             }
             trackUniqueTools(scores: &scores, event: event)
         case .prompt:
             if let hour = event.metadata?["hour"], let h = Int(hour) {
                 scores.judging += (h >= 9 && h < 18) ? 1 : -1
+            }
+            if let length = event.metadata?["promptLength"], let count = Int(length) {
+                scores.intuition += count >= 160 ? 1 : -1
+                scores.judging += count >= 160 ? 1 : 0
+            } else {
+                // A prompt without token metadata is still evidence that the
+                // owner is interacting, instead of leaving every axis static.
+                scores.extroversion += 1
             }
         case .stop, .notification:
             break

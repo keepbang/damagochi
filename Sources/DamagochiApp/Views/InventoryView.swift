@@ -50,6 +50,8 @@ struct InventoryView: View {
                 }
                 equippedSection
                 Divider()
+                fusionSection
+                Divider()
                 allItemsSection
             }
             .padding(10)
@@ -77,7 +79,7 @@ struct InventoryView: View {
 
                 EquippedPetView(
                     viewModel: viewModel,
-                    scale: 7.0,
+                    scale: 14.0 / 3.0,
                     interval: 0.5,
                     highlightedSlot: adjustCtrl.slot
                 )
@@ -126,6 +128,38 @@ struct InventoryView: View {
     }
 
     // MARK: - Equipped Slots
+
+    private var fusionSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("아이템 합성")
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+            Text("장착하지 않은 같은 단계 아이템 10개를 다음 단계 아이템 1개로 합성합니다.")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+
+            ForEach([Rarity.common, .rare, .legendary], id: \.self) { rarity in
+                let count = viewModel.fusionMaterialCount(for: rarity)
+                let nextName = rarity.next?.rawValue ?? ""
+                HStack(spacing: 6) {
+                    Text("\(rarityEmoji(rarity)) \(rarityLabel(rarity))")
+                        .font(.system(size: 10, weight: .medium))
+                    Spacer()
+                    Text("\(count)/10 → \(nextName)")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(count >= EquipmentFusion.materialCount ? .teal : .secondary)
+                    Button("합성") { viewModel.fuseItems(rarity: rarity) }
+                        .font(.system(size: 9, weight: .semibold))
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                        .disabled(count < EquipmentFusion.materialCount)
+                }
+            }
+            Text("🌈 미식 아이템은 최상위 단계라 합성할 수 없습니다.")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+        }
+    }
 
     private var equippedSection: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -277,6 +311,15 @@ struct InventoryView: View {
         case .rare:      return .blue
         case .legendary: return .yellow
         case .mythic:    return .purple
+        }
+    }
+
+    private func rarityLabel(_ rarity: Rarity) -> String {
+        switch rarity {
+        case .common: return "커먼"
+        case .rare: return "레어"
+        case .legendary: return "레전더리"
+        case .mythic: return "미식"
         }
     }
 

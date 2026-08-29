@@ -40,7 +40,9 @@ struct PopoverView: View {
             Divider()
             tabBar
         }
-        .frame(width: 280, height: 420)
+        // The slot grid adds a compact second row above the selected pet
+        // details; retain enough vertical room in both popover and main window.
+        .frame(width: 280, height: 500)
         .overlay(alignment: .top) {
             notificationBanner
         }
@@ -65,7 +67,9 @@ struct PopoverView: View {
 
     private var petView: some View {
         VStack(spacing: 8) {
-            Spacer(minLength: 4)
+            petSlots
+                .padding(.horizontal)
+                .padding(.top, 6)
 
             characterArea
                 .padding(.horizontal)
@@ -85,7 +89,7 @@ struct PopoverView: View {
             statsRow
                 .padding(.horizontal)
 
-            Spacer(minLength: 4)
+            Spacer(minLength: 0)
 
             if viewModel.canWalk || viewModel.isWalking {
                 walkButton
@@ -101,6 +105,69 @@ struct PopoverView: View {
         }
     }
 
+    private var petSlots: some View {
+        LazyVGrid(
+            columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)],
+            spacing: 6
+        ) {
+            ForEach(0..<PetRoster.maximumPets, id: \.self) { index in
+                if index < viewModel.pets.count {
+                    let pet = viewModel.pets[index]
+                    Button(action: { viewModel.selectPet(at: index) }) {
+                        petSlotCard(pet, index: index)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button(action: { viewModel.addPetSlot() }) {
+                        VStack(spacing: 2) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 16))
+                            Text(index == viewModel.pets.count ? "새 펫" : "빈 슬롯")
+                                .font(.system(size: 9, weight: .medium))
+                        }
+                        .foregroundStyle(index == viewModel.pets.count && viewModel.canAddPet ? Color.teal : Color.secondary.opacity(0.55))
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(index != viewModel.pets.count || !viewModel.canAddPet)
+                }
+            }
+        }
+    }
+
+    private func petSlotCard(_ pet: PetState, index: Int) -> some View {
+        let isSelected = index == viewModel.selectedPetIndex
+        return HStack(spacing: 5) {
+            AnimatedPetView(
+                frames: SpriteSheet.frames(species: pet.species, stage: pet.stage, phase: pet.phase),
+                scale: 4.0 / 3.0,
+                interval: 0.6
+            )
+            .frame(width: 32, height: 32)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(pet.name ?? speciesName(for: pet))
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+                Text(pet.phase == .alive ? "Lv.\(pet.level)" : pet.phase == .egg ? "알" : "사망")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity, minHeight: 42)
+        .background(
+            isSelected ? Color.accentColor.opacity(0.16) : Color.secondary.opacity(0.06),
+            in: RoundedRectangle(cornerRadius: 8)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isSelected ? Color.accentColor : .clear, lineWidth: 1)
+        )
+    }
+
     // MARK: - Character
 
     private var characterArea: some View {
@@ -110,7 +177,7 @@ struct PopoverView: View {
 
             EquippedPetView(
                 viewModel: viewModel,
-                scale: 8.0,
+                scale: 16.0 / 3.0,
                 interval: 0.5
             )
             .modifier(StateAnimationModifier(state: viewModel.state))
@@ -209,8 +276,10 @@ struct PopoverView: View {
         }
     }
 
-    private var speciesName: String {
-        guard let id = viewModel.state.species else { return "Damagochi" }
+    private var speciesName: String { speciesName(for: viewModel.state) }
+
+    private func speciesName(for pet: PetState) -> String {
+        guard let id = pet.species else { return "Damagochi" }
         return Species.allSpecies.first(where: { $0.id == id })?.name ?? id
     }
 

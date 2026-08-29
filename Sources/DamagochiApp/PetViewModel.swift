@@ -39,6 +39,7 @@ struct WalkNotification: Identifiable {
 @MainActor
 final class PetViewModel: ObservableObject {
     @Published var state: PetState
+    @Published private(set) var roster: PetRoster
     @Published var selectedTab: AppTab = .pet
     @Published var notification: PetNotification?
     @Published var claudeHookInstalled: Bool = false
@@ -51,6 +52,7 @@ final class PetViewModel: ObservableObject {
     private let processor = FeedProcessor()
     private let deathChecker = DeathChecker()
     private let inventoryManager = InventoryManager()
+    private let equipmentFusion = EquipmentFusion()
     private let claudeHookInstaller = HookInstaller()
     private let codexHookInstaller = CodexHookInstaller()
     private let notificationManager = NotificationManager.shared
@@ -75,11 +77,18 @@ final class PetViewModel: ObservableObject {
     private var petSpeechBubbleTimer: AnyCancellable?
     private var bugPopupTimer: AnyCancellable?
 
-    var baseFrames: [PixelSprite] {
+    var pets: [PetState] { roster.pets }
+    var selectedPetIndex: Int { roster.selectedIndex }
+    var canAddPet: Bool { roster.canAddPet }
+
+    var baseFrames: [PixelSprite] { baseFrames(direction: .front) }
+
+    func baseFrames(direction: SpriteDirection) -> [PixelSprite] {
         SpriteSheet.frames(
             species: state.species,
             stage: state.stage,
-            phase: state.phase
+            phase: state.phase,
+            direction: direction
         )
     }
 
@@ -158,7 +167,9 @@ final class PetViewModel: ObservableObject {
             .map { CryptoKit.SHA256.hash(data: $0) }
             .map { $0.prefix(8).map { String(format: "%02x", $0) }.joined() }
             ?? "unknown"
-        self.state = store.load() ?? PetState(machineId: hostHash)
+        let loadedRoster = store.loadRoster() ?? PetRoster(pets: [PetState(machineId: hostHash)])
+        self.roster = loadedRoster
+        self.state = loadedRoster.selectedPet ?? PetState(machineId: hostHash)
         // Auto-upgrade older damagochi hook installs so newly added Stop/Notification hooks land
         // without forcing the user to manually re-install.
         if !claudeHookInstaller.isInstalled() && claudeHookInstaller.hasAnyDamagochiHook() {
@@ -175,25 +186,24 @@ final class PetViewModel: ObservableObject {
 
         checkDeath()
 
-        if state.phase == .alive {
+        synchronizeSelectedPet()
+        for index in roster.pets.indices where roster.pets[index].phase == .alive {
             let engine = XPEngine()
-            let result = engine.checkLevelUp(currentLevel: state.level, currentXp: state.xp)
-            if result.newLevel != state.level {
-                state.level = result.newLevel
-                state.xp = result.remainingXp
-                save()
+            let result = engine.checkLevelUp(currentLevel: roster.pets[index].level, currentXp: roster.pets[index].xp)
+            if result.newLevel != roster.pets[index].level {
+                roster.pets[index].level = result.newLevel
+                roster.pets[index].xp = result.remainingXp
             }
         }
+        refreshSelectedPet()
 
         // Pending 파일은 라이브 옵저버와 별개로 모든 이벤트가 append 된다.
         // 이미 라이브로 처리된 이벤트가 재시작 시 다시 replay 되면 streakDays/통계가 망가지므로,
         // lastActiveAt 이후에 발생한 이벤트(즉 앱이 꺼져 있을 때의 catch-up)만 처리한다.
-        let cursor = state.lastActiveAt
+        let cursor = roster.pets.map(\.lastActiveAt).max() ?? state.lastActiveAt
         let pending = EventBridge.drainFileEvents()
         let fresh = pending.filter { $0.timestamp > cursor }
-        for event in fresh {
-            processor.process(event: event, state: &state)
-        }
+        for event in fresh { _ = processEventAcrossRoster(event) }
         if !fresh.isEmpty { save() }
 
         eventObserver = EventBridge.observe { [weak self] event in
@@ -244,6 +254,29 @@ final class PetViewModel: ObservableObject {
 
     var canWalk: Bool { state.phase == .alive && state.stage != .stage1 }
 
+    var walkablePets: [PetState] {
+        roster.walkableIndices.map { roster.pets[$0] }
+    }
+
+    func selectPet(at index: Int) {
+        guard roster.pets.indices.contains(index) else { return }
+        synchronizeSelectedPet()
+        roster.selectedIndex = index
+        refreshSelectedPet()
+        save()
+    }
+
+    func addPetSlot() {
+        synchronizeSelectedPet()
+        guard roster.addPet(machineId: state.machineId) else {
+            showNotification("펫은 최대 4마리까지 키울 수 있어요.", icon: "exclamationmark.circle")
+            return
+        }
+        refreshSelectedPet()
+        save()
+        showNotification("새 알이 슬롯에 추가됐어요!", icon: "plus.circle.fill")
+    }
+
     func startWalk() {
         guard canWalk else { return }
         isWalking = true
@@ -284,20 +317,29 @@ final class PetViewModel: ObservableObject {
     }
 
     private func applyWalkingDecay() {
-        guard state.phase == .alive else { return }
-        let oldHp = state.hp
-        let oldHunger = state.hunger
-        state.hp = max(0, state.hp - 1)
-        state.hunger = max(0, state.hunger - 2)
-        if state.hp != oldHp || state.hunger != oldHunger { save() }
-        if state.hp == 0 {
-            stopWalk()
-            let entry = deathChecker.processDeath(state: &state)
-            state.graveyardEntries.append(entry)
-            save()
+        synchronizeSelectedPet()
+        var changed = false
+        var selectedDied = false
+        for index in roster.walkableIndices {
+            let oldHp = roster.pets[index].hp
+            let oldHunger = roster.pets[index].hunger
+            roster.pets[index].hp = max(0, roster.pets[index].hp - 1)
+            roster.pets[index].hunger = max(0, roster.pets[index].hunger - 2)
+            changed = changed || oldHp != roster.pets[index].hp || oldHunger != roster.pets[index].hunger
+            if roster.pets[index].hp == 0 {
+                let entry = deathChecker.processDeath(state: &roster.pets[index])
+                roster.pets[index].graveyardEntries.append(entry)
+                roster.syncGlobalHistory(from: roster.pets[index])
+                selectedDied = selectedDied || index == roster.selectedIndex
+            }
+        }
+        refreshSelectedPet()
+        if changed { save() }
+        if selectedDied {
             showNotification("산책 중 과로사했습니다...", icon: "heart.slash.fill")
             sendSystemNotification { $0.sendDeath() }
         }
+        if roster.walkableIndices.isEmpty { stopWalk() }
     }
 
     private func showWalkSpeechBubble(_ message: String) {
@@ -317,18 +359,9 @@ final class PetViewModel: ObservableObject {
         state.activeBugs.remove(at: idx)
 
         let xp = bug.type.xpReward
+        let selectedShare = awardSharedXP(xp)
         if state.phase == .alive {
-            state.xp += xp
-            state.totalXp += xp
             state.mood = min(100, state.mood + 5)
-            let result = XPEngine().checkLevelUp(currentLevel: state.level, currentXp: state.xp)
-            if result.newLevel > state.level {
-                state.level = result.newLevel
-                state.xp = result.remainingXp
-                showNotification("레벨 \(state.level) 달성!", icon: "arrow.up.circle.fill")
-            } else {
-                state.xp = result.remainingXp
-            }
         }
 
         state.bugsCaught += 1
@@ -342,7 +375,7 @@ final class PetViewModel: ObservableObject {
             showNotification("\(a.name) 달성!", icon: "trophy.fill")
         }
 
-        bugXPPopup = "+\(xp) XP \(bug.type.emoji)"
+        bugXPPopup = "+\(selectedShare) XP \(bug.type.emoji)"
         bugPopupTimer?.cancel()
         bugPopupTimer = Just(()).delay(for: .seconds(1.5), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in self?.bugXPPopup = nil }
@@ -394,6 +427,22 @@ final class PetViewModel: ObservableObject {
 
     func equippedItem(for slot: EquipmentSlot) -> Equipment? {
         inventoryManager.equippedItem(for: slot, in: state)
+    }
+
+    func fusionMaterialCount(for rarity: Rarity) -> Int {
+        equipmentFusion.eligibleMaterials(for: rarity, in: state).count
+    }
+
+    func fuseItems(rarity: Rarity) {
+        do {
+            let reward = try equipmentFusion.fuse(rarity: rarity, state: &state)
+            save()
+            showNotification("합성 성공! \(reward.name)을 획득했어요.", icon: "wand.and.stars")
+        } catch let error as EquipmentFusionError {
+            showNotification(error.errorDescription ?? "합성할 수 없습니다.", icon: "exclamationmark.triangle")
+        } catch {
+            showNotification("합성에 실패했습니다.", icon: "exclamationmark.triangle")
+        }
     }
 
     // MARK: - Hook Management
@@ -481,23 +530,22 @@ final class PetViewModel: ObservableObject {
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.urls.first else { return }
         do {
-            var imported = try store.importState(from: url)
-
-            // 기존 펫이 있으면 방생 처리 후 묘지에 추가
-            let previousEntries = state.graveyardEntries
-            let previousDeathCount = state.deathCount
+            synchronizeSelectedPet()
+            var imported = try store.importRoster(from: url)
+            let previousHistory = roster.globalGraveyardEntries
             if state.phase == .alive || state.phase == .egg {
-                let entry = GraveyardEntry(from: state, cause: "이사")
-                imported.graveyardEntries = previousEntries + [entry] + imported.graveyardEntries
+                imported.globalGraveyardEntries = previousHistory + [GraveyardEntry(from: state, cause: "이사")] + imported.globalGraveyardEntries
             } else {
-                imported.graveyardEntries = previousEntries + imported.graveyardEntries
+                imported.globalGraveyardEntries = previousHistory + imported.globalGraveyardEntries
             }
-            imported.deathCount = previousDeathCount + imported.deathCount
-
-            // 현재 머신 ID로 교체
-            imported.machineId = state.machineId
-
-            state = imported
+            imported.pets = Array(imported.pets.prefix(PetRoster.maximumPets)).map { pet in
+                var updated = pet
+                updated.machineId = state.machineId
+                return updated
+            }
+            guard let importedState = imported.selectedPet else { throw MigrationError.invalidFile }
+            roster = imported
+            state = importedState
             save()
             showNotification("이사 완료! 새 캐릭터로 시작합니다.", icon: "tray.and.arrow.down.fill")
         } catch {
@@ -536,7 +584,7 @@ final class PetViewModel: ObservableObject {
         }
         let oldLevel = state.level
         let oldPhase = state.phase
-        let result = processor.process(event: event, state: &state)
+        let result = processEventAcrossRoster(event)
         checkNotifications(oldLevel: oldLevel, oldPhase: oldPhase, result: result)
         save()
     }
@@ -546,11 +594,11 @@ final class PetViewModel: ObservableObject {
         let oldPhase = state.phase
         var combinedResult = FeedResult()
         for _ in 0..<delta.newPrompts {
-            let r = processor.process(event: BehaviorEvent(kind: .prompt, metadata: ["source": ActivitySource.claude.rawValue]), state: &state)
+            let r = processEventAcrossRoster(BehaviorEvent(kind: .prompt, metadata: ["source": ActivitySource.claude.rawValue]))
             combinedResult = combinedResult.merged(with: r)
         }
         for _ in 0..<delta.newToolUses {
-            let r = processor.process(event: BehaviorEvent(kind: .toolUse, metadata: ["source": ActivitySource.claude.rawValue]), state: &state)
+            let r = processEventAcrossRoster(BehaviorEvent(kind: .toolUse, metadata: ["source": ActivitySource.claude.rawValue]))
             combinedResult = combinedResult.merged(with: r)
         }
         checkNotifications(oldLevel: oldLevel, oldPhase: oldPhase, result: combinedResult)
@@ -605,29 +653,39 @@ final class PetViewModel: ObservableObject {
     }
 
     private func applyDecay() {
-        guard state.phase == .alive else { return }
-        let inactiveHours = Int(Date().timeIntervalSince(state.lastActiveAt) / 3600)
-        let oldHp = state.hp
-        let oldHunger = state.hunger
-        HealthSystem().applyDecay(to: &state, inactiveHours: inactiveHours)
-        if state.hp != oldHp || state.hunger != oldHunger {
-            save()
+        synchronizeSelectedPet()
+        var changed = false
+        for index in roster.pets.indices where roster.pets[index].phase == .alive {
+            let inactiveHours = Int(Date().timeIntervalSince(roster.pets[index].lastActiveAt) / 3600)
+            let oldHp = roster.pets[index].hp
+            let oldHunger = roster.pets[index].hunger
+            HealthSystem().applyDecay(to: &roster.pets[index], inactiveHours: inactiveHours)
+            changed = changed || oldHp != roster.pets[index].hp || oldHunger != roster.pets[index].hunger
         }
+        refreshSelectedPet()
+        if changed { save() }
     }
 
     private func checkDeath() {
-        guard state.phase == .alive else { return }
-        let days = deathChecker.inactiveBusinessDays(lastActive: state.lastActiveAt, now: Date())
-
-        if deathChecker.shouldDie(inactiveBusinessDays: days) {
-            let entry = deathChecker.processDeath(state: &state)
-            state.graveyardEntries.append(entry)
+        synchronizeSelectedPet()
+        var selectedDied = false
+        for index in roster.pets.indices where roster.pets[index].phase == .alive {
+            let days = deathChecker.inactiveBusinessDays(lastActive: roster.pets[index].lastActiveAt, now: Date())
+            if deathChecker.shouldDie(inactiveBusinessDays: days) {
+                let entry = deathChecker.processDeath(state: &roster.pets[index])
+                roster.pets[index].graveyardEntries.append(entry)
+                roster.syncGlobalHistory(from: roster.pets[index])
+                selectedDied = selectedDied || index == roster.selectedIndex
+            }
+        }
+        refreshSelectedPet()
+        if selectedDied {
             save()
             showNotification("펫이 사망했습니다...", icon: "heart.slash.fill")
             sendSystemNotification { $0.sendDeath() }
             return
         }
-
+        let days = deathChecker.inactiveBusinessDays(lastActive: state.lastActiveAt, now: Date())
         let warning = deathChecker.warningLevel(inactiveBusinessDays: days)
         switch warning {
         case .critical:
@@ -760,6 +818,63 @@ final class PetViewModel: ObservableObject {
     }
 
     func save() {
-        store.save(state)
+        synchronizeSelectedPet()
+        store.save(roster)
+    }
+
+    private func synchronizeSelectedPet() {
+        roster.replaceSelectedPet(with: state)
+    }
+
+    private func refreshSelectedPet() {
+        if let selected = roster.selectedPet { state = selected }
+    }
+
+    @discardableResult
+    private func processEventAcrossRoster(_ event: BehaviorEvent) -> FeedResult {
+        synchronizeSelectedPet()
+        let baseXP = XPEngine().xpForEvent(event, streakDays: state.streakDays)
+        let shares = roster.distributeXP(baseXP)
+        var selectedResult = FeedResult()
+        for index in roster.pets.indices {
+            let result = processor.process(event: event, state: &roster.pets[index], xpOverride: shares[index] ?? 0)
+            if index == roster.selectedIndex { selectedResult = result }
+            roster.syncGlobalHistory(from: roster.pets[index])
+        }
+        refreshSelectedPet()
+        return selectedResult
+    }
+
+    /// Applies non-event rewards (bugs and battle rewards) using the same
+    /// roster-level split as hook events without incrementing activity stats.
+    @discardableResult
+    func awardSharedXP(_ totalXP: Int) -> Int {
+        synchronizeSelectedPet()
+        let shares = roster.distributeXP(totalXP)
+        for index in roster.pets.indices {
+            let share = shares[index] ?? 0
+            guard share > 0 else { continue }
+            roster.pets[index].totalXp += share
+            switch roster.pets[index].phase {
+            case .egg:
+                if XPEngine().shouldHatch(totalXp: roster.pets[index].totalXp) {
+                    EvolutionEngine().evolve(state: &roster.pets[index])
+                    roster.pets[index].xp = roster.pets[index].totalXp - 100
+                }
+            case .alive:
+                roster.pets[index].xp += share
+                let levelResult = XPEngine().checkLevelUp(
+                    currentLevel: roster.pets[index].level,
+                    currentXp: roster.pets[index].xp
+                )
+                roster.pets[index].level = levelResult.newLevel
+                roster.pets[index].xp = levelResult.remainingXp
+            case .dead:
+                break
+            }
+        }
+        let selectedShare = shares[roster.selectedIndex] ?? 0
+        refreshSelectedPet()
+        return selectedShare
     }
 }

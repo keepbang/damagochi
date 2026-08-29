@@ -25,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.battleViewModel = battleViewModel
 
         let popover = NSPopover()
-        popover.contentSize = NSSize(width: 280, height: 420)
+        popover.contentSize = NSSize(width: 280, height: 500)
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(
             rootView: PopoverView(viewModel: viewModel, battleViewModel: battleViewModel)

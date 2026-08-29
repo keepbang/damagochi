@@ -28,6 +28,14 @@ public struct BattleProfile: Codable, Sendable, Identifiable {
     public let speciesId: String
     /// Optional so profiles sent by older app versions remain decodable.
     public let stage: Stage?
+    /// Battle-only capped level. The stored pet level is never mutated.
+    public let battleLevel: Int?
+    /// Appearance snapshot captured when the profile is sent.
+    public let equippedItems: EquippedItems?
+    public let equipmentOffsets: EquipmentOffsets?
+    /// At most three equipped instances; keeps generated fusion item artwork
+    /// resolvable without transmitting the full inventory.
+    public let equippedEquipment: [Equipment]?
     public let mbtiGroup: MbtiGroup
     public let speciesRarity: Rarity
     public var stats: BattleStats
@@ -39,7 +47,11 @@ public struct BattleProfile: Codable, Sendable, Identifiable {
         mbtiGroup: MbtiGroup,
         speciesRarity: Rarity,
         stats: BattleStats,
-        stage: Stage? = nil
+        stage: Stage? = nil,
+        battleLevel: Int? = nil,
+        equippedItems: EquippedItems? = nil,
+        equipmentOffsets: EquipmentOffsets? = nil,
+        equippedEquipment: [Equipment]? = nil
     ) {
         self.id = id
         self.petName = petName
@@ -48,6 +60,10 @@ public struct BattleProfile: Codable, Sendable, Identifiable {
         self.mbtiGroup = mbtiGroup
         self.speciesRarity = speciesRarity
         self.stats = stats
+        self.battleLevel = battleLevel
+        self.equippedItems = equippedItems
+        self.equipmentOffsets = equipmentOffsets
+        self.equippedEquipment = equippedEquipment
     }
 }
 
@@ -60,7 +76,8 @@ public extension BattleProfile {
               let species = Species.allSpecies.first(where: { $0.id == speciesId })
         else { return nil }
 
-        let levelMult  = 1.0 + Double(state.level) * 0.1
+        let effectiveBattleLevel = min(max(state.level, 0), 50)
+        let levelMult  = 1.0 + Double(effectiveBattleLevel) * 0.1
         let rarityMult = species.rarity.battleMultiplier
 
         let handBonus = handAtkBonus(equipped: state.equippedItems, inventory: state.inventory)
@@ -72,13 +89,19 @@ public extension BattleProfile {
 
         let stats = BattleStats(atk: atk, int_: int_, maxHp: hp, spd: spd, def: def)
         return BattleProfile(
-            id: state.machineId,
+            // PetState saves before slots have no petId, so machineId remains
+            // the backwards-compatible identity fallback.
+            id: state.petId ?? state.machineId,
             petName: state.name ?? species.name,
             speciesId: speciesId,
             mbtiGroup: species.group,
             speciesRarity: species.rarity,
             stats: stats,
-            stage: state.stage
+            stage: state.stage,
+            battleLevel: effectiveBattleLevel,
+            equippedItems: state.equippedItems,
+            equipmentOffsets: state.equipmentOffsets,
+            equippedEquipment: equippedEquipment(from: state)
         )
     }
 
@@ -100,6 +123,11 @@ public extension BattleProfile {
               let item = inventory.first(where: { $0.id == id })
         else { return 0 }
         return item.rarity.handAtkBonus
+    }
+
+    private static func equippedEquipment(from state: PetState) -> [Equipment] {
+        let ids = Set([state.equippedItems.head, state.equippedItems.hand, state.equippedItems.effect].compactMap { $0 })
+        return state.inventory.filter { ids.contains($0.id) }
     }
 }
 

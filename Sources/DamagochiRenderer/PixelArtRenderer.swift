@@ -82,6 +82,25 @@ public struct PixelSprite: Sendable {
         )
     }
 
+    public func mirrored() -> PixelSprite {
+        PixelSprite(width: width, height: height, pixels: pixels.map { Array($0.reversed()) })
+    }
+
+    /// Expands legacy 16×16 code sprites into the renderer's 24×24 grid while
+    /// retaining hard pixel edges. All rendering callers can therefore use one
+    /// grid size even while older saved character IDs keep their original art.
+    public func nearestResized(width targetWidth: Int, height targetHeight: Int) -> PixelSprite {
+        guard width > 0, height > 0, targetWidth > 0, targetHeight > 0 else { return .empty }
+        let resized = (0..<targetHeight).map { targetY in
+            (0..<targetWidth).map { targetX in
+                let sourceY = min(height - 1, targetY * height / targetHeight)
+                let sourceX = min(width - 1, targetX * width / targetWidth)
+                return pixels[sourceY][sourceX]
+            }
+        }
+        return PixelSprite(width: targetWidth, height: targetHeight, pixels: resized)
+    }
+
     public func overlaid(with overlay: PixelSprite) -> PixelSprite {
         var result = pixels
         for row in 0..<min(height, overlay.height) {
