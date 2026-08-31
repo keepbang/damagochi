@@ -3,14 +3,26 @@ import DamagochiCore
 import DamagochiRenderer
 
 let arguments = Array(CommandLine.arguments.dropFirst())
-let directions = arguments.first == "--directions"
-let outputPath = arguments.last(where: { $0 != "--directions" })
-    ?? (directions ? "docs/assets/expanded-character-directions.png" : "docs/assets/character-catalog.png")
+let showcase = arguments.contains("--showcase")
+let expandedDirections = arguments.contains("--expanded-directions")
+let silhouettes = arguments.contains("--silhouettes")
+let directions = arguments.contains("--directions") || expandedDirections || showcase
+let flags = Set(["--directions", "--expanded-directions", "--showcase", "--silhouettes"])
+let outputPath = arguments.last(where: { !flags.contains($0) })
+    ?? (showcase ? "docs/assets/character-directions.png"
+        : silhouettes ? "docs/assets/character-silhouettes.png"
+        : expandedDirections ? "docs/assets/expanded-character-directions.png"
+        : directions ? "docs/assets/character-directions.png"
+        : "docs/assets/character-catalog.png")
 let outputURL = URL(fileURLWithPath: outputPath, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
-let speciesList = directions ? Array(Species.allSpecies.dropFirst(40)) : Species.allSpecies
-let columns = directions ? 8 : 10
+let speciesList = showcase
+    ? ["wolf", "owl", "octopus", "atlas_beetle", "android", "teapot", "world_tree", "dragon", "mermaid", "skate", "ninja", "lightning"].compactMap { id in Species.allSpecies.first(where: { $0.id == id }) }
+    : expandedDirections ? Array(Species.allSpecies.dropFirst(40)) : Species.allSpecies
+let columns = showcase ? 4 : directions ? 8 : 10
 let cardSize = 252
-let scale = directions ? 4 : 8
+// A 48px source needs half the old output scale to preserve the same card
+// footprint while exposing its native one-pixel detail.
+let scale = directions ? 2 : 4
 let rows = Int(ceil(Double(speciesList.count) / Double(columns)))
 let imageSize = NSSize(width: columns * cardSize, height: rows * cardSize)
 
@@ -44,7 +56,8 @@ for (index, species) in speciesList.enumerated() {
     NSColor(calibratedWhite: 0.84, alpha: 1).setStroke()
     NSBezierPath(roundedRect: card, xRadius: 12, yRadius: 12).stroke()
 
-    let label = "#\(directions ? index + 41 : index + 1)  \(species.name)"
+    let catalogIndex = Species.allSpecies.firstIndex(where: { $0.id == species.id }).map { $0 + 1 } ?? index + 1
+    let label = "#\(catalogIndex)  \(species.name)"
     label.draw(at: NSPoint(x: originX + 16, y: originY + 218), withAttributes: [
         .font: NSFont.systemFont(ofSize: 16, weight: .semibold),
         .foregroundColor: NSColor.labelColor,
@@ -57,10 +70,10 @@ for (index, species) in speciesList.enumerated() {
             let localY = 24 + (1 - directionIndex / 2) * 100
             let marker = ["정", "후", "좌", "우"][directionIndex]
             marker.draw(at: NSPoint(x: originX + localX, y: originY + localY + 60), withAttributes: [.font: NSFont.systemFont(ofSize: 10), .foregroundColor: NSColor.secondaryLabelColor])
-            draw(sprite, atX: originX + localX, y: originY + localY, scale: scale)
+            draw(sprite, atX: originX + localX, y: originY + localY, scale: scale, silhouette: silhouettes)
         }
     } else if let sprite = SpriteSheet.frames(species: species.id, stage: .stage3, phase: .alive, direction: .front).first {
-        draw(sprite, atX: originX + (cardSize - sprite.width * scale) / 2, y: originY + 30, scale: scale)
+        draw(sprite, atX: originX + (cardSize - sprite.width * scale) / 2, y: originY + 30, scale: scale, silhouette: silhouettes)
     }
 }
 
@@ -72,12 +85,16 @@ try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(
 try data.write(to: outputURL)
 print(outputURL.path)
 
-private func draw(_ sprite: PixelSprite, atX originX: Int, y originY: Int, scale: Int) {
+private func draw(_ sprite: PixelSprite, atX originX: Int, y originY: Int, scale: Int, silhouette: Bool = false) {
     for y in 0..<sprite.height {
         for x in 0..<sprite.width {
             let pixel = sprite.pixels[y][x]
             guard !pixel.isTransparent else { continue }
-            NSColor(red: CGFloat((pixel.rawValue >> 16) & 0xFF) / 255, green: CGFloat((pixel.rawValue >> 8) & 0xFF) / 255, blue: CGFloat(pixel.rawValue & 0xFF) / 255, alpha: CGFloat((pixel.rawValue >> 24) & 0xFF) / 255).setFill()
+            if silhouette {
+                NSColor.black.setFill()
+            } else {
+                NSColor(red: CGFloat((pixel.rawValue >> 16) & 0xFF) / 255, green: CGFloat((pixel.rawValue >> 8) & 0xFF) / 255, blue: CGFloat(pixel.rawValue & 0xFF) / 255, alpha: CGFloat((pixel.rawValue >> 24) & 0xFF) / 255).setFill()
+            }
             NSBezierPath(rect: NSRect(x: originX + x * scale, y: originY + (sprite.height - 1 - y) * scale, width: scale, height: scale)).fill()
         }
     }

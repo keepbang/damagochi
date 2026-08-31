@@ -8,9 +8,19 @@ public enum SpriteDirection: String, Codable, Sendable, CaseIterable {
 }
 
 public enum SpriteSheet {
-    /// The runtime sheet is 24×24. `gridScale` preserves the original on-screen
-    /// footprint when a caller lowers its point scale from legacy 16×16 art.
-    public static let spriteGridSize = 24
+    /// Living pets are authored on a 48×48 native grid.  The UI renderer uses
+    /// `pointScale` so this additional detail does not make pets physically
+    /// larger than the previous 24×24 presentation.
+    public static let spriteGridSize = 48
+
+    /// One authored pixel occupies half of the former point size.  A 48px pet
+    /// therefore keeps the same on-screen footprint as its former 24px frame,
+    /// while ears, masks, beaks and facial highlights can use smaller pixels.
+    public static let pointScale = 0.5
+
+    /// Equipment offsets are stored in the legacy 16px coordinate system.
+    /// They remain visually stable because callers render the 48px grid at
+    /// `pointScale`.
     public static let gridScale = 1.5
 
     public static func frames(
@@ -20,14 +30,12 @@ public enum SpriteSheet {
         direction: SpriteDirection = .front
     ) -> [PixelSprite] {
         if let species,
-           (direction != .front || ExpandedSpeciesSprites.generatedFrontSpeciesIDs.contains(species)),
            let expanded = ExpandedSpeciesSprites.frames(species: species, stage: stage, direction: direction) {
-            let requiresGridExpansion = ExpandedSpeciesSprites.generatedFrontSpeciesIDs.contains(species)
             switch phase {
             case .alive:
-                return requiresGridExpansion ? expanded.map { $0.nearestResized(width: spriteGridSize, height: spriteGridSize) } : expanded
+                return expanded
             case .dead:
-                return requiresGridExpansion ? expanded.map { $0.grayed().nearestResized(width: spriteGridSize, height: spriteGridSize) } : expanded.map { $0.grayed() }
+                return expanded.map { $0.grayed() }
             case .egg: break
             }
         }
@@ -40,9 +48,8 @@ public enum SpriteSheet {
         case .alive:
             base = aliveFrames(species: species, stage: stage)
         }
-        // The original sheets were front-only. Direction is a first-class API
-        // now, with mirrored side frames as a safe compatibility fallback until
-        // a species provides bespoke asymmetric artwork.
+        // Egg art remains direction-neutral. Every living catalog species is
+        // returned above from the species-first four-view renderer.
         let directional: [PixelSprite]
         switch direction {
         case .front, .back, .sideRight:

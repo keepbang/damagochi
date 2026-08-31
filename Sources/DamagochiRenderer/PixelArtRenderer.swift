@@ -43,6 +43,14 @@ public struct PixelColor: Sendable, Equatable {
     public static let darkRed   = PixelColor(0xFF881111)
     public static let lime      = PixelColor(0xFF88CC44)
 
+    // Muted supporting tones keep the native-resolution pets from reading as
+    // flat UI glyphs. They are intentionally softer than the legacy palette:
+    // use them for compact fur/fabric clusters, not as a new silhouette colour.
+    public static let warmGray  = PixelColor(0xFFC9B8B4)
+    public static let blush     = PixelColor(0xFFE9A7B4)
+    public static let mistBlue  = PixelColor(0xFF789BC2)
+    public static let cocoa     = PixelColor(0xFF6D3B2C)
+
     public func grayed() -> PixelColor {
         guard !isTransparent else { return self }
         let a = (rawValue >> 24) & 0xFF
@@ -86,9 +94,9 @@ public struct PixelSprite: Sendable {
         PixelSprite(width: width, height: height, pixels: pixels.map { Array($0.reversed()) })
     }
 
-    /// Expands legacy 16×16 code sprites into the renderer's 24×24 grid while
+    /// Expands legacy code sprites into the renderer's native grid while
     /// retaining hard pixel edges. All rendering callers can therefore use one
-    /// grid size even while older saved character IDs keep their original art.
+    /// grid size even while eggs and equipment keep their original art source.
     public func nearestResized(width targetWidth: Int, height targetHeight: Int) -> PixelSprite {
         guard width > 0, height > 0, targetWidth > 0, targetHeight > 0 else { return .empty }
         let resized = (0..<targetHeight).map { targetY in
@@ -146,22 +154,23 @@ public struct PixelArtView: View {
     }
 
     public var body: some View {
+        let effectiveScale = scale * SpriteSheet.pointScale
         Canvas { context, _ in
             for row in 0..<sprite.height {
                 for col in 0..<sprite.width {
                     let color = sprite.pixels[row][col]
                     guard !color.isTransparent else { continue }
                     let rect = CGRect(
-                        x: CGFloat(col) * scale,
-                        y: CGFloat(row) * scale,
-                        width: scale,
-                        height: scale
+                        x: CGFloat(col) * effectiveScale,
+                        y: CGFloat(row) * effectiveScale,
+                        width: effectiveScale,
+                        height: effectiveScale
                     )
                     context.fill(Path(rect), with: .color(Color(hex: color.rawValue)))
                 }
             }
         }
-        .frame(width: CGFloat(sprite.width) * scale, height: CGFloat(sprite.height) * scale)
+        .frame(width: CGFloat(sprite.width) * effectiveScale, height: CGFloat(sprite.height) * effectiveScale)
         .drawingGroup()
     }
 }

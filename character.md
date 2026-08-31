@@ -23,9 +23,11 @@
 - 모든 캐릭터와 성장 단계는 `front`, `back`, `sideLeft`, `sideRight` 각각 2프레임 애니메이션을 제공한다.
 - Reduce Motion이 켜져 있으면 화면은 각 방향의 첫 프레임을 고정해서 사용한다.
 - 장비 레이어는 항상 `기본 펫 → head/hand → effect` 순서이며, 장비 위치 오프셋도 방향별 렌더링 스케일에 맞춰 적용된다.
-- Stage 1·2·3은 같은 캐릭터 ID를 유지하며 몸통 크기만 성장한다. 도감 프리뷰는 식별이 가장 쉬운 Stage 3로 통일했다.
+- Stage 1·2·3은 같은 캐릭터 ID와 종별 체형을 유지한 채 성장한다. 큰 머리·작은 몸 같은 공통 비율을 강제하지 않되, 얼굴·머리와 몸통은 정면에서 대체로 1:1에 가까운 시각 비중으로 맞춘다. 꼬리·날개·줄기·기계 부속물은 종을 구분하는 별도 특징으로 남긴다.
+- 모든 펫은 몸 비율과 별개로 종별 얼굴 위치(머리·부리·벨·화면·꽃 중심·나무 옹이·원소 코어)를 갖는다. 유색 외곽선 안에 밝은 면·부드러운 그림자·2~3픽셀 색 덩어리를 겹쳐, 확대된 도감 아이콘이 아닌 둥근 게임 캐릭터처럼 마감한다. 공통 마름모 몸통이나 대칭 문양은 사용하지 않는다.
+- 80종 모두 이름의 실제 구조를 먼저 그린다. 늑대·여우는 길게 이어지는 등선·주둥이·꼬리, 새는 부리·접힌 날개·꼬리깃, 코끼리·매머드는 귀·코·상아, 장수풍뎅이는 머리뿔·분절 등딱지·여섯 다리, 거북·전갈은 등딱지·집게·분절 꼬리, 꽃·버섯·선인장은 줄기와 실제 꽃잎·갓·붙은 팔, 사물은 손잡이·뚜껑·축·기어·성벽, 고래·가오리는 지느러미와 꼬리, 인어는 사람 상체·팔과 하나로 이어지는 물고기 꼬리를 우선한다. 귀여운 표정은 이 실제 골격 위에만 추가한다.
 
-> 참고: 1~40번은 기존 수제 정면 스프라이트를 유지하고, 41~80번은 같은 16×16 원화 규격에서 종별 실루엣을 직접 그린다. 두 경우 모두 이 문서의 프리뷰가 현재 앱 출력값이다.
+> 참고: 1~80번 전체는 정면까지 포함한 동일한 종별 48×48 원화 체계에서 렌더링한다. 화면에서 차지하는 크기는 기존과 같지만, 귀·눈가·주둥이·꼬리 줄무늬·지느러미에 더 작은 원본 픽셀을 사용한다. 정면·후면·좌·우는 색만 바꾼 반전본이 아니라, 실제 꼬리·날개·등판·머리카락·손잡이·지느러미와 표정 위치가 달라지는 독립 프레임이다. 방향을 구분하려는 임의의 가시·직선 돌기는 사용하지 않는다.
 
 프리뷰는 아래 명령으로 런타임 `SpriteSheet` 출력에서 다시 만들 수 있다.
 
@@ -33,11 +35,28 @@
 swift run damagochi-sprite-catalog
 ```
 
-확장 40종의 정면·후면·좌측·우측 프리뷰는 다음 명령으로 별도 생성한다.
+전체 80종의 상태·배틀·산책 방향 프리뷰는 다음 명령으로 만든다.
 
 ```bash
 swift run damagochi-sprite-catalog --directions
 ```
+
+서로 다른 체형을 빠르게 검토할 수 있는 단색 실루엣 도감은 다음 명령으로 만든다.
+
+```bash
+swift run damagochi-sprite-catalog --silhouettes
+```
+
+![80종 단색 실루엣 도감](./docs/assets/character-silhouettes.png)
+
+대표 12종의 네 방향 카드와 확장 40종 전용 도감은 각각 아래 명령으로 생성한다.
+
+```bash
+swift run damagochi-sprite-catalog --showcase docs/assets/character-showcase-directions.png
+swift run damagochi-sprite-catalog --expanded-directions
+```
+
+![종별 체형 대표 방향 도감](./docs/assets/character-showcase-directions.png)
 
 ![확장 40종 방향별 실제 스프라이트](./docs/assets/expanded-character-directions.png)
 
@@ -85,7 +104,7 @@ swift run damagochi-sprite-catalog --directions
 | 53 | 복숭아 | Peach / `peach` | common | 분홍 열매의 세로 골과 초록 잎 |
 | 54 | 달나방 | Luna Moth / `luna_moth` | rare | 넓게 펼친 연두 날개와 보라 무늬 |
 | 55 | 카피바라 | Capybara / `capybara` | rare | 넓고 낮은 갈색 몸, 긴 주둥이와 짧은 다리 |
-| 56 | 인어 | Mermaid / `mermaid` | rare | 분홍 머리와 청록색 물고기 꼬리 |
+| 56 | 인어 | Mermaid / `mermaid` | rare | 분홍 머리카락·사람 상체와 팔, 하나로 이어지는 청록 물고기 꼬리 |
 | 57 | 페가수스 | Pegasus / `pegasus` | legendary | 흰 날개·갈기와 황금 뿔 |
 | 58 | 달꽃 | Moonflower / `moonflower` | legendary | 보랏빛 꽃잎, 금빛 중심과 초록 줄기 |
 | 59 | 세라프 | Seraph / `seraph` | mythic | 후광과 대칭의 흰 날개 |
@@ -133,7 +152,7 @@ swift run damagochi-sprite-catalog --directions
 | 71 | 너구리 | Raccoon / `raccoon` | common | 눈가의 검은 마스크와 줄무늬 꼬리 |
 | 72 | 페럿 | Ferret / `ferret` | common | 길고 낮은 크림색 몸과 가는 꼬리 |
 | 73 | 도마뱀 | Gecko / `gecko` | common | 넓은 발가락, 돌출한 눈과 긴 꼬리 |
-| 74 | 가오리 | Skate / `skate` | rare | 마름모 날개와 아래로 늘어진 꼬리 |
+| 74 | 가오리 | Skate / `skate` | rare | 넓고 둥근 양 날개, 가운데 얼굴과 아래로 늘어진 꼬리 |
 | 75 | 앵무새 | Parakeet / `parakeet` | rare | 초록 깃털, 산호색 부리와 긴 꼬리깃 |
 | 76 | 닌자 | Ninja / `ninja` | rare | 보랏빛 머리띠와 눈만 드러난 검은 복면 |
 | 77 | 와이번 | Wyvern / `wyvern` | legendary | 보라 날개·뿔과 긴 용 꼬리 |
@@ -144,5 +163,5 @@ swift run damagochi-sprite-catalog --directions
 ## 데이터 호환성 및 갱신 방법
 
 - 캐릭터의 영구 식별자는 표의 `ID`다. 기존 저장 데이터의 ID는 변경하지 않는다.
-- 종족의 이름·영문명·희귀도·MBTI 그룹은 [Species.swift](./Sources/DamagochiCore/Models/Species.swift)에서, 실제 프레임은 [SpriteSheet.swift](./Sources/DamagochiRenderer/SpriteSheet.swift) 및 [ExpandedSpeciesSprites.swift](./Sources/DamagochiRenderer/ExpandedSpeciesSprites.swift)에서 관리한다.
+- 종족의 이름·영문명·희귀도·MBTI 그룹은 [Species.swift](./Sources/DamagochiCore/Models/Species.swift)에서, 실제 프레임은 [SpriteSheet.swift](./Sources/DamagochiRenderer/SpriteSheet.swift) 및 [SpeciesAnatomySprites.swift](./Sources/DamagochiRenderer/SpeciesAnatomySprites.swift)에서 관리한다.
 - 캐릭터를 추가하거나 스프라이트를 바꾸면 이 문서의 프리뷰 이미지도 같은 `SpriteSheet.frames` 출력으로 다시 생성해야 한다.

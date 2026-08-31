@@ -13,8 +13,9 @@ struct EquippedPetView: View {
 
     var body: some View {
         let baseFrames = viewModel.baseFrames(direction: direction)
-        let baseWidth = CGFloat(baseFrames.first?.width ?? 16) * scale
-        let baseHeight = CGFloat(baseFrames.first?.height ?? 16) * scale
+        let effectiveScale = scale * SpriteSheet.pointScale
+        let baseWidth = CGFloat(baseFrames.first?.width ?? 16) * effectiveScale
+        let baseHeight = CGFloat(baseFrames.first?.height ?? 16) * effectiveScale
         let overlays = viewModel.equippedOverlays
 
         let effectOverlay = overlays.first(where: { $0.slot == .effect })
