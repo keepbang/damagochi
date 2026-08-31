@@ -7,7 +7,9 @@ struct WalkingPetView: View {
     @State private var motions: [String: ParkPetMotion] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private let parkSize = CGSize(width: 640, height: 640)
+    /// Keep the floating walk window compact enough to sit beside a working
+    /// desktop without obscuring the active app.
+    private let parkSize = CGSize(width: 320, height: 320)
     private let motionEngine = ParkMotionEngine()
 
     var body: some View {
@@ -114,18 +116,26 @@ private struct WalkingPetSprite: View {
     let pet: PetState
     let direction: SpriteDirection
 
+    private var facesLeft: Bool { direction == .sideLeft }
+
     var body: some View {
         AnimatedPetView(
             frames: SpriteSheet.frames(
                 species: pet.species,
                 stage: pet.stage,
                 phase: pet.phase,
-                direction: direction
+                // The main pet artwork is the consistently validated front
+                // sheet. Some directional catalog sheets have different
+                // source geometry, which can make a walking pet look torn or
+                // distorted. Mirror the stable frame for leftward movement
+                // instead of switching to that incompatible artwork.
+                direction: .front
             ),
             scale: 2.0,
             interval: 0.45
         )
-        .frame(width: 72, height: 72)
+        .scaleEffect(x: facesLeft ? -1 : 1, y: 1, anchor: .center)
+        .frame(width: 48, height: 48)
         .shadow(color: .black.opacity(0.18), radius: 3, y: 3)
     }
 }

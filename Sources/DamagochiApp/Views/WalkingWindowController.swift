@@ -17,7 +17,7 @@ final class WalkingWindowController {
         let hostingController = NSHostingController(rootView: WalkingPetView(viewModel: viewModel))
 
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 680, height: 740),
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 460),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
