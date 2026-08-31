@@ -17,8 +17,8 @@ final class WalkingWindowController {
         let hostingController = NSHostingController(rootView: WalkingPetView(viewModel: viewModel))
 
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 460),
-            styleMask: [.borderless, .nonactivatingPanel],
+            contentRect: NSRect(origin: .zero, size: WalkingPetView.defaultContentSize),
+            styleMask: [.borderless, .nonactivatingPanel, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -28,8 +28,8 @@ final class WalkingWindowController {
         panel.isOpaque = false
         panel.hasShadow = false
         panel.isMovableByWindowBackground = true
+        panel.minSize = WalkingPetView.minimumContentSize
         panel.contentViewController = hostingController
-        panel.setContentSize(hostingController.view.fittingSize)
 
         if let screen = NSScreen.main {
             let f = screen.visibleFrame

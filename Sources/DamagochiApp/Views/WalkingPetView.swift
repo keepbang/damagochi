@@ -3,13 +3,13 @@ import DamagochiCore
 import DamagochiRenderer
 
 struct WalkingPetView: View {
+    static let minimumContentSize = CGSize(width: 280, height: 360)
+    static let defaultContentSize = CGSize(width: 360, height: 460)
+
     @ObservedObject var viewModel: PetViewModel
     @State private var motions: [String: ParkPetMotion] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Keep the floating walk window compact enough to sit beside a working
-    /// desktop without obscuring the active app.
-    private let parkSize = CGSize(width: 320, height: 320)
     private let motionEngine = ParkMotionEngine()
 
     var body: some View {
@@ -36,14 +36,20 @@ struct WalkingPetView: View {
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 18))
-                .onAppear { resetPositions(in: geo.size) }
+                .onAppear {
+                    guard geo.size.width > 0, geo.size.height > 0 else { return }
+                    resetPositions(in: geo.size)
+                }
                 .onChange(of: viewModel.walkablePets.count) { _, _ in resetPositions(in: geo.size) }
+                .onChange(of: geo.size) { oldSize, newSize in
+                    resizePositions(from: oldSize, to: newSize)
+                }
                 .onReceive(Timer.publish(every: 2.6, on: .main, in: .common).autoconnect()) { _ in
                     guard !reduceMotion else { return }
                     movePets(in: geo.size)
                 }
             }
-            .frame(width: parkSize.width, height: parkSize.height)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.22), lineWidth: 1))
 
             HStack {
@@ -62,6 +68,8 @@ struct WalkingPetView: View {
             .padding(.horizontal, 10)
         }
         .padding(10)
+        .frame(minWidth: Self.minimumContentSize.width, minHeight: Self.minimumContentSize.height)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.spring(duration: 0.3), value: viewModel.walkSpeechBubble != nil)
     }
 
@@ -74,6 +82,7 @@ struct WalkingPetView: View {
     }
 
     private func resetPositions(in size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
         let starts = motionEngine.initialMotions(
             count: viewModel.walkablePets.count,
             width: size.width,
@@ -81,6 +90,28 @@ struct WalkingPetView: View {
         )
         motions = Dictionary(uniqueKeysWithValues: zip(viewModel.walkablePets.indices, starts).map { index, motion in
             (motionKey(for: viewModel.walkablePets[index], index: index), motion)
+        })
+    }
+
+    private func resizePositions(from oldSize: CGSize, to newSize: CGSize) {
+        guard newSize.width > 0, newSize.height > 0 else { return }
+        guard oldSize.width > 0, oldSize.height > 0, !motions.isEmpty else {
+            resetPositions(in: newSize)
+            return
+        }
+
+        motions = Dictionary(uniqueKeysWithValues: viewModel.walkablePets.indices.map { index in
+            let pet = viewModel.walkablePets[index]
+            let key = motionKey(for: pet, index: index)
+            let current = motions[key] ?? fallbackMotion(for: index, in: oldSize)
+            let resized = motionEngine.resizedMotion(
+                from: current,
+                oldWidth: oldSize.width,
+                oldHeight: oldSize.height,
+                width: newSize.width,
+                height: newSize.height
+            )
+            return (key, resized)
         })
     }
 
@@ -116,7 +147,6 @@ private struct WalkingPetSprite: View {
     let pet: PetState
     let direction: SpriteDirection
 
-    private var facesLeft: Bool { direction == .sideLeft }
     private let scale: CGFloat = 2.0
 
     private var equipmentOverlays: [SpriteSheet.EquippedOverlay] {
@@ -133,12 +163,9 @@ private struct WalkingPetSprite: View {
                     species: pet.species,
                     stage: pet.stage,
                     phase: pet.phase,
-                    // The main pet artwork is the consistently validated front
-                    // sheet. Some directional catalog sheets have different
-                    // source geometry, which can make a walking pet look torn or
-                    // distorted. Mirror the stable frame for leftward movement
-                    // instead of switching to that incompatible artwork.
-                    direction: .front
+                    // Pick a side-facing sprite directly instead of animating a
+                    // geometric flip. This keeps the pet upright while it walks.
+                    direction: direction
                 ),
                 scale: scale,
                 interval: 0.45
@@ -163,7 +190,6 @@ private struct WalkingPetSprite: View {
             }
         }
         .frame(width: 48, height: 48)
-        .scaleEffect(x: facesLeft ? -1 : 1, y: 1, anchor: .center)
         .shadow(color: .black.opacity(0.18), radius: 3, y: 3)
     }
 }
