@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import DamagochiCore
 import DamagochiRenderer
@@ -70,6 +71,20 @@ struct WalkingPetView: View {
         .padding(10)
         .frame(minWidth: Self.minimumContentSize.width, minHeight: Self.minimumContentSize.height)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .bottomTrailing) {
+            WindowResizeHandle()
+                .frame(width: 26, height: 26)
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: "arrow.down.right.and.arrow.up.left")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .padding(5)
+                        .allowsHitTesting(false)
+                }
+                .padding(4)
+                .accessibilityLabel("산책 창 크기 조절")
+                .accessibilityHint("오른쪽 아래 모서리를 드래그해 창 크기를 조절합니다")
+        }
         .animation(.spring(duration: 0.3), value: viewModel.walkSpeechBubble != nil)
     }
 
@@ -140,6 +155,58 @@ struct WalkingPetView: View {
         .padding(8)
         .frame(maxWidth: 260, alignment: .leading)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+private struct WindowResizeHandle: NSViewRepresentable {
+    func makeNSView(context _: Context) -> WindowResizeHandleView {
+        WindowResizeHandleView()
+    }
+
+    func updateNSView(_: WindowResizeHandleView, context _: Context) {}
+}
+
+private final class WindowResizeHandleView: NSView {
+    private var initialFrame: NSRect?
+    private var initialMouseLocation: NSPoint?
+
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: .crosshair)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        initialFrame = window.frame
+        initialMouseLocation = event.locationInWindow
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let window,
+              let initialFrame,
+              let initialMouseLocation
+        else { return }
+
+        let current = event.locationInWindow
+        let width = initialFrame.width + current.x - initialMouseLocation.x
+        let height = initialFrame.height - (current.y - initialMouseLocation.y)
+        let constrained = NSSize(
+            width: min(max(width, window.minSize.width), window.maxSize.width),
+            height: min(max(height, window.minSize.height), window.maxSize.height)
+        )
+        let frame = NSRect(
+            x: initialFrame.minX,
+            y: initialFrame.maxY - constrained.height,
+            width: constrained.width,
+            height: constrained.height
+        )
+        window.setFrame(frame, display: true)
+    }
+
+    override func mouseUp(with _: NSEvent) {
+        initialFrame = nil
+        initialMouseLocation = nil
     }
 }
 
