@@ -238,28 +238,9 @@ struct BattleView: View {
                 LazyVStack(spacing: 6) {
                     ForEach(battleVM.selectableProfiles) { profile in
                         let order = battleVM.tournamentPetIDs.firstIndex(of: profile.id).map { $0 + 1 }
-                        Button {
+                        TournamentPetSelectionRow(profile: profile, order: order) {
                             battleVM.selectTournamentPet(profile)
-                        } label: {
-                            HStack(spacing: 8) {
-                                Text(order.map(String.init) ?? "·")
-                                    .font(.caption.bold().monospacedDigit())
-                                    .frame(width: 22, height: 22)
-                                    .background(order == nil ? Color.secondary.opacity(0.12) : Color.teal.opacity(0.25), in: Circle())
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(profile.petName).font(.caption.bold())
-                                    Text("Lv.\(profile.battleLevel ?? 0) · \(profile.mbtiGroup.rawValue.uppercased())")
-                                        .font(.caption2).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text(order == nil ? "선택" : "\(order)번 출전")
-                                    .font(.caption2).foregroundStyle(order == nil ? .secondary : .teal)
-                            }
-                            .padding(8)
-                            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
                         }
-                        .buttonStyle(.plain)
-                        .disabled(order != nil)
                     }
                 }
                 .padding(.horizontal, 10)
@@ -467,6 +448,39 @@ struct BattleView: View {
         Text(rarity.shortLabel).font(.system(size: 8).bold()).foregroundStyle(rarity.color)
             .padding(.horizontal, 4).padding(.vertical, 1)
             .background(rarity.color.opacity(0.15), in: Capsule())
+    }
+}
+
+private struct TournamentPetSelectionRow: View {
+    let profile: BattleProfile
+    let order: Int?
+    let select: () -> Void
+
+    private var orderLabel: String { order.map(String.init) ?? "·" }
+    private var selectionLabel: String { order.map { "\($0)번 출전" } ?? "선택" }
+    private var selected: Bool { order != nil }
+
+    var body: some View {
+        Button(action: select) {
+            HStack(spacing: 8) {
+                Text(orderLabel)
+                    .font(.caption.bold().monospacedDigit())
+                    .frame(width: 22, height: 22)
+                    .background(selected ? Color.teal.opacity(0.25) : Color.secondary.opacity(0.12), in: Circle())
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(profile.petName).font(.caption.bold())
+                    Text("Lv.\(profile.battleLevel ?? 0) · \(profile.mbtiGroup.rawValue.uppercased())")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Text(selectionLabel)
+                    .font(.caption2).foregroundStyle(selected ? .teal : .secondary)
+            }
+            .padding(8)
+            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .disabled(selected)
     }
 }
 
