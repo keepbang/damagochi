@@ -91,3 +91,19 @@ import Testing
     #expect(ids.contains("workdays_30"))
     #expect(!ids.contains("workdays_100"))
 }
+
+@Test func accountActivityUnlocksExpandedAchievementsWithoutPetLocalCounters() {
+    let checker = AchievementChecker()
+    var state = PetState(machineId: "test")
+    state.phase = .alive
+    state.level = 1
+
+    let achievements = checker.check(
+        state: state,
+        activityStats: ActivityStats(prompts: 5_000, toolUses: 1_000, sessions: 500)
+    )
+    let ids = Set(achievements.map(\.id))
+    #expect(ids.contains("prompts_5000"))
+    #expect(ids.contains("tools_1000"))
+    #expect(ids.contains("sessions_500"))
+}

@@ -32,8 +32,7 @@ public struct BattleProfile: Codable, Sendable, Identifiable {
     public let battleLevel: Int?
     /// Appearance snapshot captured when the profile is sent.
     public let equippedItems: EquippedItems?
-    public let equipmentOffsets: EquipmentOffsets?
-    /// At most three equipped instances; keeps generated fusion item artwork
+    /// At most one visual effect instance; keeps generated fusion item artwork
     /// resolvable without transmitting the full inventory.
     public let equippedEquipment: [Equipment]?
     public let mbtiGroup: MbtiGroup
@@ -50,7 +49,6 @@ public struct BattleProfile: Codable, Sendable, Identifiable {
         stage: Stage? = nil,
         battleLevel: Int? = nil,
         equippedItems: EquippedItems? = nil,
-        equipmentOffsets: EquipmentOffsets? = nil,
         equippedEquipment: [Equipment]? = nil
     ) {
         self.id = id
@@ -62,7 +60,6 @@ public struct BattleProfile: Codable, Sendable, Identifiable {
         self.stats = stats
         self.battleLevel = battleLevel
         self.equippedItems = equippedItems
-        self.equipmentOffsets = equipmentOffsets
         self.equippedEquipment = equippedEquipment
     }
 }
@@ -70,7 +67,7 @@ public struct BattleProfile: Codable, Sendable, Identifiable {
 // MARK: - PetState → BattleProfile
 
 public extension BattleProfile {
-    static func from(_ state: PetState) -> BattleProfile? {
+    static func from(_ state: PetState, activityStats: ActivityStats? = nil) -> BattleProfile? {
         guard state.phase == .alive,
               let speciesId = state.species,
               let species = Species.allSpecies.first(where: { $0.id == speciesId })
@@ -80,10 +77,15 @@ public extension BattleProfile {
         let levelMult  = 1.0 + Double(effectiveBattleLevel) * 0.1
         let rarityMult = species.rarity.battleMultiplier
 
+        let activity = activityStats ?? ActivityStats(
+            prompts: state.totalPrompts,
+            toolUses: state.totalToolUses,
+            sessions: state.totalSessions
+        )
         let handBonus = handAtkBonus(equipped: state.equippedItems, inventory: state.inventory)
-        let atk  = max(1, Int(log(Double(state.totalToolUses + 1)) * 10.0 * levelMult * rarityMult)) + handBonus
-        let int_ = max(1, Int(log(Double(state.totalPrompts  + 1)) * 10.0 * levelMult * rarityMult))
-        let hp   = max(100, Int(log(Double(state.totalSessions + 1)) * 150.0 * levelMult * rarityMult))
+        let atk  = max(1, Int(log(Double(activity.toolUses + 1)) * 10.0 * levelMult * rarityMult)) + handBonus
+        let int_ = max(1, Int(log(Double(activity.prompts  + 1)) * 10.0 * levelMult * rarityMult))
+        let hp   = max(100, Int(log(Double(activity.sessions + 1)) * 150.0 * levelMult * rarityMult))
         let spd  = max(1, Int(Double(state.streakDays) * 5.0 * levelMult * rarityMult))
         let def  = calcDef(equipped: state.equippedItems, inventory: state.inventory)
 
@@ -99,8 +101,7 @@ public extension BattleProfile {
             stats: stats,
             stage: state.stage,
             battleLevel: effectiveBattleLevel,
-            equippedItems: state.equippedItems,
-            equipmentOffsets: state.equipmentOffsets,
+            equippedItems: EquippedItems(effect: state.equippedItems.effect),
             equippedEquipment: equippedEquipment(from: state)
         )
     }
@@ -126,8 +127,8 @@ public extension BattleProfile {
     }
 
     private static func equippedEquipment(from state: PetState) -> [Equipment] {
-        let ids = Set([state.equippedItems.head, state.equippedItems.hand, state.equippedItems.effect].compactMap { $0 })
-        return state.inventory.filter { ids.contains($0.id) }
+        guard let effectID = state.equippedItems.effect else { return [] }
+        return state.inventory.filter { $0.id == effectID && $0.slot == .effect }
     }
 }
 

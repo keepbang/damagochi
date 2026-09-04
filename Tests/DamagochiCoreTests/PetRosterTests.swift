@@ -15,6 +15,24 @@ import Testing
     #expect(roster.globalUnlockedAchievements == ["first"])
 }
 
+@Test func rosterMigratesMirroredLegacyActivityToOneAccountStat() {
+    var first = PetState(machineId: "device")
+    first.totalPrompts = 12
+    first.totalToolUses = 9
+    first.totalSessions = 3
+    var second = first
+    second.petId = UUID().uuidString
+
+    var roster = PetRoster(pets: [first, second])
+    roster.migrateAccountActivityStatsIfNeeded()
+
+    #expect(roster.activityStats == ActivityStats(prompts: 12, toolUses: 9, sessions: 3))
+    roster.recordAccountActivity(.prompt)
+    #expect(roster.activityStats.prompts == 13)
+    #expect(roster.pets[0].totalPrompts == 12)
+    #expect(roster.pets[1].totalPrompts == 12)
+}
+
 @Test func petRosterEnforcesFourSlotLimit() {
     var roster = PetRoster(pets: [PetState(machineId: "one")])
 

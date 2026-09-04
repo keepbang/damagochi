@@ -121,6 +121,16 @@ struct BattleView: View {
     }
 
     private var browsingView: some View {
+        Group {
+            if battleVM.mode == .team && !battleVM.isTournamentOrderReady {
+                tournamentOrderSelectionView
+            } else {
+                battleDiscoveryView
+            }
+        }
+    }
+
+    private var battleDiscoveryView: some View {
         VStack(spacing: 9) {
             myStatsCard.padding(.horizontal, 10).padding(.top, 8)
             Divider().padding(.horizontal, 10)
@@ -162,17 +172,17 @@ struct BattleView: View {
         if battleVM.mode == .team {
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    Text("내 팀 · 전원 출전").font(.subheadline.bold())
+                    Text("내 팀 · 출전 순서 확정").font(.subheadline.bold())
                     Spacer()
                     Text("\(battleVM.teamProfiles.count)마리").font(.caption).foregroundStyle(.secondary)
                 }
                 TeamProfileGrid(profiles: battleVM.teamProfiles, activeID: nil, tint: .teal)
-                Text("펫이 쓰러지면 다음 생존 펫이 자동으로 출전합니다.")
+                Text("양측 보유 펫 수 중 적은 수만 출전하며, 펫이 쓰러지면 다음 순서가 자동 출전합니다.")
                     .font(.system(size: 9)).foregroundStyle(.secondary)
             }
             .padding(8)
             .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
-        } else if let profile = BattleProfile.from(petVM.state) {
+        } else if let profile = battleVM.selectedSingleProfile {
             VStack(spacing: 4) {
                 HStack {
                     Text(profile.petName).font(.subheadline.bold()).lineLimit(1)
@@ -181,10 +191,85 @@ struct BattleView: View {
                     Text("Lv.\(petVM.state.level)").font(.caption).foregroundStyle(.secondary)
                 }
                 statGrid(profile.stats)
+                if battleVM.selectableProfiles.count > 1 {
+                    singlePetPicker
+                }
             }
             .padding(8)
             .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
         }
+    }
+
+    private var singlePetPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 5) {
+                ForEach(battleVM.selectableProfiles) { profile in
+                    let selected = battleVM.selectedSingleProfile?.id == profile.id
+                    Button {
+                        battleVM.selectSinglePet(profile)
+                    } label: {
+                        Text(profile.petName)
+                            .font(.system(size: 9, weight: selected ? .bold : .regular))
+                            .lineLimit(1)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(selected ? Color.teal.opacity(0.22) : Color.primary.opacity(0.05), in: Capsule())
+                            .overlay(Capsule().stroke(selected ? Color.teal : .clear, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("싱글 출전 펫 \(profile.petName)")
+                }
+            }
+        }
+    }
+
+    private var tournamentOrderSelectionView: some View {
+        VStack(spacing: 10) {
+            VStack(spacing: 4) {
+                Text("토너먼트 출전 순서").font(.headline)
+                Text("\(battleVM.tournamentSecondsRemaining)초 안에 펫을 클릭한 순서대로 출전합니다.")
+                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                Text("시간이 끝나면 선택하지 않은 펫은 슬롯 순서로 뒤에 추가됩니다.")
+                    .font(.caption2).foregroundStyle(.tertiary).multilineTextAlignment(.center)
+            }
+            .padding(.top, 12)
+
+            ScrollView {
+                LazyVStack(spacing: 6) {
+                    ForEach(battleVM.selectableProfiles) { profile in
+                        let order = battleVM.tournamentPetIDs.firstIndex(of: profile.id).map { $0 + 1 }
+                        Button {
+                            battleVM.selectTournamentPet(profile)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text(order.map(String.init) ?? "·")
+                                    .font(.caption.bold().monospacedDigit())
+                                    .frame(width: 22, height: 22)
+                                    .background(order == nil ? Color.secondary.opacity(0.12) : Color.teal.opacity(0.25), in: Circle())
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(profile.petName).font(.caption.bold())
+                                    Text("Lv.\(profile.battleLevel ?? 0) · \(profile.mbtiGroup.rawValue.uppercased())")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(order == nil ? "선택" : "\(order)번 출전")
+                                    .font(.caption2).foregroundStyle(order == nil ? .secondary : .teal)
+                            }
+                            .padding(8)
+                            .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(order != nil)
+                    }
+                }
+                .padding(.horizontal, 10)
+            }
+
+            Button("순서 다시 고르기") { battleVM.restartTournamentSelection() }
+                .buttonStyle(.bordered).controlSize(.small)
+                .padding(.bottom, 10)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func connectionWaitingView(peerId: String) -> some View {
@@ -592,14 +677,9 @@ private struct BattleEquipmentOverlays: View {
             equipped: profile.equippedItems ?? EquippedItems(),
             inventory: profile.equippedEquipment ?? EquipmentDropper.itemPool
         )
-        let offsets = profile.equipmentOffsets ?? EquipmentOffsets()
         ZStack {
-            ForEach(overlays, id: \.slot) { overlay in
+            ForEach(overlays.filter { $0.slot == .effect }, id: \.slot) { overlay in
                 PixelArtView(sprite: overlay.sprite, scale: scale)
-                    .offset(
-                        x: CGFloat(offsets.offset(for: overlay.slot).x) * scale * SpriteSheet.gridScale,
-                        y: CGFloat(offsets.offset(for: overlay.slot).y) * scale * SpriteSheet.gridScale
-                    )
                     .allowsHitTesting(false)
             }
         }

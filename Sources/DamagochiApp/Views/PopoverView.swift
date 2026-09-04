@@ -153,7 +153,7 @@ struct PopoverView: View {
                 Text(pet.phase == .alive ? "Lv.\(pet.level)" : pet.phase == .egg ? "알" : "사망")
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
-                if let profile = BattleProfile.from(pet) {
+                if let profile = viewModel.battleProfile(for: pet) {
                     Text("A\(profile.stats.atk) D\(profile.stats.def) S\(profile.stats.spd)")
                         .font(.system(size: 7, design: .monospaced))
                         .foregroundStyle(.teal)
@@ -357,13 +357,13 @@ struct PopoverView: View {
     private var statsRow: some View {
         VStack(spacing: 4) {
             HStack {
-                statItem(icon: "text.bubble", count: viewModel.state.totalPrompts)
+                statItem(icon: "text.bubble", count: viewModel.accountActivityStats.prompts)
                     .onHover { statsTooltip = $0 ? "총 프롬프트 입력 횟수" : nil }
                 Spacer()
-                statItem(icon: "wrench", count: viewModel.state.totalToolUses)
+                statItem(icon: "wrench", count: viewModel.accountActivityStats.toolUses)
                     .onHover { statsTooltip = $0 ? "툴 사용 횟수 (Read, Edit, Grep 등)" : nil }
                 Spacer()
-                statItem(icon: "play.circle", count: viewModel.state.totalSessions)
+                statItem(icon: "play.circle", count: viewModel.accountActivityStats.sessions)
                     .onHover { statsTooltip = $0 ? "Claude Code / Codex 세션 시작 횟수" : nil }
                 Spacer()
                 streakItem

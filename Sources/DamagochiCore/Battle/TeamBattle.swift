@@ -24,6 +24,15 @@ public struct BattleTeamProfile: Codable, Sendable, Identifiable {
         self.id = id
         self.members = Array(members.prefix(4))
     }
+
+    /// Tournament matches use the smaller participant roster so neither side
+    /// can field more pets than the other. The input order is preserved.
+    public static func tournamentMembers(
+        _ members: [BattleProfile],
+        opponentMemberCount: Int
+    ) -> [BattleProfile] {
+        Array(members.prefix(min(4, max(0, opponentMemberCount))))
+    }
 }
 
 public enum TeamBattleStatus: Codable, Sendable, Equatable {

@@ -80,6 +80,7 @@ final class PetViewModel: ObservableObject {
     var pets: [PetState] { roster.pets }
     var selectedPetIndex: Int { roster.selectedIndex }
     var canAddPet: Bool { roster.canAddPet }
+    var accountActivityStats: ActivityStats { roster.activityStats }
 
     var baseFrames: [PixelSprite] { baseFrames(direction: .front) }
 
@@ -97,23 +98,7 @@ final class PetViewModel: ObservableObject {
         return SpriteSheet.equippedOverlays(
             equipped: state.equippedItems,
             inventory: state.inventory
-        )
-    }
-
-    func equipmentOffset(for slot: EquipmentSlot) -> PixelOffset {
-        (state.equipmentOffsets ?? EquipmentOffsets()).offset(for: slot)
-    }
-
-    func setEquipmentOffset(_ offset: PixelOffset, for slot: EquipmentSlot) {
-        var offsets = state.equipmentOffsets ?? EquipmentOffsets()
-        guard offsets.offset(for: slot) != offset else { return }
-        offsets.setOffset(offset, for: slot)
-        state.equipmentOffsets = offsets
-    }
-
-    func resetEquipmentOffset(for slot: EquipmentSlot) {
-        setEquipmentOffset(.zero, for: slot)
-        save()
+        ).filter { $0.slot == .effect }
     }
 
     func setPetName(_ name: String) {
@@ -167,7 +152,8 @@ final class PetViewModel: ObservableObject {
             .map { CryptoKit.SHA256.hash(data: $0) }
             .map { $0.prefix(8).map { String(format: "%02x", $0) }.joined() }
             ?? "unknown"
-        let loadedRoster = store.loadRoster() ?? PetRoster(pets: [PetState(machineId: hostHash)])
+        var loadedRoster = store.loadRoster() ?? PetRoster(pets: [PetState(machineId: hostHash)])
+        loadedRoster.migrateAccountActivityStatsIfNeeded()
         self.roster = loadedRoster
         self.state = loadedRoster.selectedPet ?? PetState(machineId: hostHash)
         // Auto-upgrade older damagochi hook installs so newly added Stop/Notification hooks land
@@ -369,7 +355,7 @@ final class PetViewModel: ObservableObject {
         if bug.type == .rainbow { state.rainbowBugsCaught += 1 }
 
         let checker = AchievementChecker()
-        let newAchievements = checker.check(state: state)
+        let newAchievements = checker.check(state: state, activityStats: roster.activityStats)
         for a in newAchievements {
             state.unlockedAchievements.append(a.id)
             showNotification("\(a.name) 달성!", icon: "trophy.fill")
@@ -819,6 +805,7 @@ final class PetViewModel: ObservableObject {
 
     func save() {
         synchronizeSelectedPet()
+        roster.migrateAccountActivityStatsIfNeeded()
         store.save(roster)
     }
 
@@ -833,11 +820,19 @@ final class PetViewModel: ObservableObject {
     @discardableResult
     private func processEventAcrossRoster(_ event: BehaviorEvent) -> FeedResult {
         synchronizeSelectedPet()
+        roster.recordAccountActivity(event.kind)
         let baseXP = XPEngine().xpForEvent(event, streakDays: state.streakDays)
         let shares = roster.distributeXP(baseXP)
+        let accountStats = roster.activityStats
         var selectedResult = FeedResult()
         for index in roster.pets.indices {
-            let result = processor.process(event: event, state: &roster.pets[index], xpOverride: shares[index] ?? 0)
+            let result = processor.process(
+                event: event,
+                state: &roster.pets[index],
+                xpOverride: shares[index] ?? 0,
+                recordActivity: false,
+                achievementActivityStats: accountStats
+            )
             if index == roster.selectedIndex { selectedResult = result }
             roster.syncGlobalHistory(from: roster.pets[index])
         }
@@ -889,5 +884,9 @@ final class PetViewModel: ObservableObject {
         } else {
             roster.pets[recipientIndex].inventory.append(item)
         }
+    }
+
+    func battleProfile(for pet: PetState) -> BattleProfile? {
+        BattleProfile.from(pet, activityStats: roster.activityStats)
     }
 }

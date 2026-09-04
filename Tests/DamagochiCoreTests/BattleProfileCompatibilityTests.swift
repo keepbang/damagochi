@@ -72,7 +72,7 @@ import Testing
     #expect(BattleProfile.from(first)?.id != BattleProfile.from(second)?.id)
 }
 
-@Test func battleProfileContainsOnlyEquippedAppearanceInstances() {
+@Test func battleProfileContainsOnlyEquippedEffectAppearanceInstance() {
     var state = PetState(machineId: "appearance")
     state.phase = .alive
     state.species = "cat"
@@ -80,9 +80,26 @@ import Testing
     let hand = Equipment(id: "hand", name: "지팡이", slot: .hand, rarity: .rare, description: "테스트")
     let spare = Equipment(id: "spare", name: "여분", slot: .effect, rarity: .common, description: "테스트")
     state.inventory = [head, hand, spare]
-    state.equippedItems = EquippedItems(head: head.id, hand: hand.id)
+    state.equippedItems = EquippedItems(head: head.id, hand: hand.id, effect: spare.id)
 
     let profile = BattleProfile.from(state)
 
-    #expect(profile?.equippedEquipment?.map(\.id).sorted() == ["hand", "head"])
+    #expect(profile?.equippedItems?.head == nil)
+    #expect(profile?.equippedItems?.hand == nil)
+    #expect(profile?.equippedItems?.effect == "spare")
+    #expect(profile?.equippedEquipment?.map(\.id) == ["spare"])
+}
+
+@Test func battleProfileUsesAccountActivityWithoutChangingPetXPStats() {
+    var state = PetState(machineId: "account")
+    state.phase = .alive
+    state.species = "cat"
+    let profile = BattleProfile.from(
+        state,
+        activityStats: ActivityStats(prompts: 100, toolUses: 200, sessions: 20)
+    )
+
+    #expect(profile?.stats.atk ?? 0 > 1)
+    #expect(profile?.stats.int_ ?? 0 > 1)
+    #expect(profile?.stats.maxHp ?? 0 > 100)
 }

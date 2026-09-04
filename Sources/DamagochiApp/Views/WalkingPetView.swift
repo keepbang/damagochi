@@ -149,11 +149,11 @@ private struct WalkingPetSprite: View {
 
     private let scale: CGFloat = 2.0
 
-    private var equipmentOverlays: [SpriteSheet.EquippedOverlay] {
+    private var effectOverlay: SpriteSheet.EquippedOverlay? {
         SpriteSheet.equippedOverlays(
             equipped: pet.equippedItems,
             inventory: pet.inventory
-        )
+        ).first(where: { $0.slot == .effect })
     }
 
     var body: some View {
@@ -171,41 +171,13 @@ private struct WalkingPetSprite: View {
                 interval: 0.45
             )
 
-            ForEach(equipmentOverlays.filter { $0.slot != .effect }, id: \.slot) { overlay in
-                WalkingPetEquipmentOverlay(
-                    overlay: overlay,
-                    offset: (pet.equipmentOffsets ?? EquipmentOffsets()).offset(for: overlay.slot),
-                    scale: scale
-                )
-            }
-
-            // Effects should remain above the pet and its handheld/head gear,
-            // matching the inventory and battle presentations.
-            if let effect = equipmentOverlays.first(where: { $0.slot == .effect }) {
-                WalkingPetEquipmentOverlay(
-                    overlay: effect,
-                    offset: (pet.equipmentOffsets ?? EquipmentOffsets()).offset(for: effect.slot),
-                    scale: scale
-                )
+            if let effect = effectOverlay {
+                PixelArtView(sprite: effect.sprite, scale: scale)
+                    .allowsHitTesting(false)
             }
         }
         .frame(width: 48, height: 48)
         .shadow(color: .black.opacity(0.18), radius: 3, y: 3)
-    }
-}
-
-private struct WalkingPetEquipmentOverlay: View {
-    let overlay: SpriteSheet.EquippedOverlay
-    let offset: PixelOffset
-    let scale: CGFloat
-
-    var body: some View {
-        PixelArtView(sprite: overlay.sprite, scale: scale)
-            .offset(
-                x: CGFloat(offset.x) * scale * SpriteSheet.gridScale,
-                y: CGFloat(offset.y) * scale * SpriteSheet.gridScale
-            )
-            .allowsHitTesting(false)
     }
 }
 

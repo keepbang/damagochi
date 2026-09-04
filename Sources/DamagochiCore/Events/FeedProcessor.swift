@@ -62,7 +62,9 @@ public struct FeedProcessor: Sendable {
     public func process(
         event: BehaviorEvent,
         state: inout PetState,
-        xpOverride: Int? = nil
+        xpOverride: Int? = nil,
+        recordActivity: Bool = true,
+        achievementActivityStats: ActivityStats? = nil
     ) -> FeedResult {
         if case .stop = event.kind { return FeedResult() }
         if case .notification = event.kind { return FeedResult() }
@@ -86,13 +88,15 @@ public struct FeedProcessor: Sendable {
         }
         state.lastActiveAt = event.timestamp
 
-        switch event.kind {
-        case .prompt: state.totalPrompts += 1
-        case .toolUse: state.totalToolUses += 1
-        case .sessionStart: state.totalSessions += 1
-        case .stop, .notification: break
+        if recordActivity {
+            switch event.kind {
+            case .prompt: state.totalPrompts += 1
+            case .toolUse: state.totalToolUses += 1
+            case .sessionStart: state.totalSessions += 1
+            case .stop, .notification: break
+            }
+            state.recordActivity(event.kind, source: event.source)
         }
-        state.recordActivity(event.kind, source: event.source)
 
         personalityTracker.updateMbti(scores: &state.mbtiScores, event: event)
 
@@ -125,7 +129,7 @@ public struct FeedProcessor: Sendable {
             healthSystem.applyRecovery(to: &state)
         }
 
-        let newAchievements = achievementChecker.check(state: state)
+        let newAchievements = achievementChecker.check(state: state, activityStats: achievementActivityStats)
         for achievement in newAchievements {
             state.unlockedAchievements.append(achievement.id)
         }

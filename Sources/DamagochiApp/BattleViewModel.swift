@@ -47,6 +47,10 @@ final class BattleViewModel: ObservableObject {
     @Published var selectedSkillId: String?
     @Published var selectionSecondsRemaining = Int(BattleTimeout.skillSelectSeconds)
     @Published var battlePresentation: BattlePresentation?
+    @Published private(set) var selectedSinglePetID: String?
+    @Published private(set) var tournamentPetIDs: [String] = []
+    @Published private(set) var tournamentSecondsRemaining = 0
+    @Published private(set) var isTournamentOrderReady = false
 
     struct FoundPeer: Identifiable {
         let id: String
@@ -74,6 +78,9 @@ final class BattleViewModel: ObservableObject {
     private var isBrowsing = false
     private var activePeerId: String?
     private var ignoredPeerIds: Set<String> = []
+    private var tournamentSelectionTask: Task<Void, Never>?
+
+    private static let tournamentSelectionSeconds = 60
 
     // MARK: - Init
 
@@ -102,6 +109,7 @@ final class BattleViewModel: ObservableObject {
         connectTask?.cancel()
         connectionTimeoutTask?.cancel()
         selectionTimeoutTask?.cancel()
+        tournamentSelectionTask?.cancel()
         opponentResponseTask?.cancel()
         finishTask?.cancel()
     }
@@ -151,8 +159,41 @@ final class BattleViewModel: ObservableObject {
         guard phase == .browsing, self.mode != mode else { return }
         self.mode = mode
         errorMessage = nil
+        if mode == .team {
+            beginTournamentSelection()
+        } else {
+            tournamentSelectionTask?.cancel()
+            tournamentSecondsRemaining = 0
+            isTournamentOrderReady = false
+        }
         stopBrowsing()
         startBrowsing()
+    }
+
+    func selectSinglePet(_ profile: BattleProfile) {
+        guard phase == .browsing,
+              selectableProfiles.contains(where: { $0.id == profile.id })
+        else { return }
+        selectedSinglePetID = profile.id
+    }
+
+    func selectTournamentPet(_ profile: BattleProfile) {
+        guard mode == .team,
+              phase == .browsing,
+              !isTournamentOrderReady,
+              selectableProfiles.contains(where: { $0.id == profile.id }),
+              !tournamentPetIDs.contains(profile.id)
+        else { return }
+
+        tournamentPetIDs.append(profile.id)
+        if tournamentPetIDs.count == selectableProfiles.count {
+            finishTournamentSelection()
+        }
+    }
+
+    func restartTournamentSelection() {
+        guard mode == .team, phase == .browsing else { return }
+        beginTournamentSelection()
     }
 
     /// Re-evaluates eligibility and the advertised pet name when the battle UI
@@ -165,6 +206,10 @@ final class BattleViewModel: ObservableObject {
     func invitePeer(_ peer: FoundPeer) {
         guard canBattle else {
             errorMessage = "알이 부화한 뒤 배틀할 수 있습니다"
+            return
+        }
+        guard mode != .team || isTournamentOrderReady else {
+            errorMessage = "토너먼트 출전 펫 순서를 먼저 확정해 주세요"
             return
         }
         guard case .browsing = phase else { return }
@@ -260,25 +305,38 @@ final class BattleViewModel: ObservableObject {
         if let group = battleState?.myProfile.mbtiGroup {
             return BattleSkill.skills(for: group)
         }
-        guard let speciesId = petViewModel?.state.species,
-              let species = Species.allSpecies.first(where: { $0.id == speciesId })
+        guard let group = selectedSingleProfile?.mbtiGroup
         else { return [] }
-        return BattleSkill.skills(for: species.group)
+        return BattleSkill.skills(for: group)
     }
 
     var canBattle: Bool {
         switch mode {
         case .single:
-            guard let state = petViewModel?.state else { return false }
-            return BattleProfile.from(state) != nil
+            return selectedSingleProfile != nil
         case .team:
-            return teamProfiles.count >= 2
+            return selectableProfiles.count >= 2
         }
     }
 
+    var selectableProfiles: [BattleProfile] {
+        guard let viewModel = petViewModel else { return [] }
+        return viewModel.pets.compactMap(viewModel.battleProfile)
+    }
+
+    var selectedSingleProfile: BattleProfile? {
+        let profiles = selectableProfiles
+        if let selectedSinglePetID,
+           let selected = profiles.first(where: { $0.id == selectedSinglePetID }) {
+            return selected
+        }
+        return profiles.first(where: { $0.id == petViewModel?.state.petId }) ?? profiles.first
+    }
+
     var teamProfiles: [BattleProfile] {
-        guard let roster = petViewModel?.roster else { return [] }
-        return roster.pets.compactMap(BattleProfile.from)
+        let profiles = selectableProfiles
+        let ordered = tournamentPetIDs.compactMap { id in profiles.first(where: { $0.id == id }) }
+        return ordered + profiles.filter { profile in !tournamentPetIDs.contains(profile.id) }
     }
 
     // MARK: - Event Listener
@@ -311,6 +369,11 @@ final class BattleViewModel: ObservableObject {
             }
             guard canBattle else {
                 transport.disconnect()
+                return
+            }
+            guard mode != .team || isTournamentOrderReady else {
+                transport.disconnect()
+                errorMessage = "토너먼트 출전 펫 순서를 먼저 확정해 주세요"
                 return
             }
             switch phase {
@@ -368,8 +431,7 @@ final class BattleViewModel: ObservableObject {
             }
             guard case .connecting = phase,
                   activePeerId != nil,
-                  let myState = petViewModel?.state,
-                  let myProfile = BattleProfile.from(myState)
+                  let myProfile = selectedSingleProfile
             else {
                 recoverToBrowsing(message: "배틀 가능한 펫 프로필이 없습니다", ignoreActivePeer: true)
                 return
@@ -385,11 +447,21 @@ final class BattleViewModel: ObservableObject {
             startSelectionCountdown()
 
         case .teamProfile(let opponentTeam):
+            let orderedMine = teamProfiles
+            let myTournamentMembers = BattleTeamProfile.tournamentMembers(
+                orderedMine,
+                opponentMemberCount: opponentTeam.members.count
+            )
+            let opponentTournamentMembers = BattleTeamProfile.tournamentMembers(
+                opponentTeam.members,
+                opponentMemberCount: orderedMine.count
+            )
             guard mode == .team,
                   case .connecting = phase,
                   activePeerId != nil,
-                  opponentTeam.members.count >= 2,
-                  let team = TeamBattleState(myTeam: teamProfiles, opponentTeam: opponentTeam.members)
+                  opponentTournamentMembers.count >= 2,
+                  isTournamentOrderReady,
+                  let team = TeamBattleState(myTeam: myTournamentMembers, opponentTeam: opponentTournamentMembers)
             else {
                 recoverToBrowsing(message: "팀 배틀 팀 구성이 올바르지 않거나 상대 모드가 다릅니다.", ignoreActivePeer: true)
                 return
@@ -527,16 +599,15 @@ final class BattleViewModel: ObservableObject {
         do {
             switch mode {
             case .single:
-                guard let myState = petViewModel?.state,
-                      let profile = BattleProfile.from(myState)
+                guard let profile = selectedSingleProfile
                 else {
                     recoverToBrowsing(message: "알이 부화한 뒤 배틀할 수 있습니다", ignoreActivePeer: true)
                     return
                 }
                 try transport.send(.profile(profile))
             case .team:
-                guard teamProfiles.count >= 2 else {
-                    recoverToBrowsing(message: "팀 배틀에는 생존 펫이 2마리 이상 필요합니다", ignoreActivePeer: true)
+                guard isTournamentOrderReady, teamProfiles.count >= 2 else {
+                    recoverToBrowsing(message: "출전 펫 순서를 먼저 확정해 주세요", ignoreActivePeer: true)
                     return
                 }
                 let teamId = petViewModel?.state.machineId ?? UUID().uuidString
@@ -648,6 +719,9 @@ final class BattleViewModel: ObservableObject {
 
     private func handlePetStateChange(_ state: PetState) {
         transport.updateDisplayName(Self.displayName(for: state))
+        if selectedSingleProfile == nil {
+            selectedSinglePetID = selectableProfiles.first?.id
+        }
         if !canBattle {
             stopBrowsing()
             if phase != .browsing {
@@ -666,6 +740,37 @@ final class BattleViewModel: ObservableObject {
             return species.name
         }
         return state.machineId
+    }
+
+    private func beginTournamentSelection() {
+        tournamentSelectionTask?.cancel()
+        tournamentPetIDs = []
+        isTournamentOrderReady = false
+        let seconds = Self.tournamentSelectionSeconds
+        tournamentSecondsRemaining = seconds
+
+        tournamentSelectionTask = Task { [weak self] in
+            guard let self else { return }
+            for remaining in stride(from: seconds - 1, through: 0, by: -1) {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled,
+                      self.mode == .team,
+                      self.phase == .browsing,
+                      !self.isTournamentOrderReady
+                else { return }
+                self.tournamentSecondsRemaining = remaining
+            }
+            self.finishTournamentSelection()
+        }
+    }
+
+    private func finishTournamentSelection() {
+        let remaining = selectableProfiles.map(\.id).filter { !tournamentPetIDs.contains($0) }
+        tournamentPetIDs.append(contentsOf: remaining)
+        tournamentSecondsRemaining = 0
+        isTournamentOrderReady = tournamentPetIDs.count >= 2
+        tournamentSelectionTask?.cancel()
+        tournamentSelectionTask = nil
     }
 
     // MARK: - Reward

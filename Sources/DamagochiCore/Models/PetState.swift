@@ -38,50 +38,6 @@ public struct EquippedItems: Codable, Sendable {
     }
 }
 
-public struct PixelOffset: Codable, Sendable, Equatable {
-    public var x: Int
-    public var y: Int
-
-    public init(x: Int = 0, y: Int = 0) {
-        self.x = x
-        self.y = y
-    }
-
-    public static let zero = PixelOffset(x: 0, y: 0)
-}
-
-public struct EquipmentOffsets: Codable, Sendable, Equatable {
-    public var head: PixelOffset
-    public var hand: PixelOffset
-    public var effect: PixelOffset
-
-    public init(
-        head: PixelOffset = .zero,
-        hand: PixelOffset = .zero,
-        effect: PixelOffset = .zero
-    ) {
-        self.head = head
-        self.hand = hand
-        self.effect = effect
-    }
-
-    public func offset(for slot: EquipmentSlot) -> PixelOffset {
-        switch slot {
-        case .head:   return head
-        case .hand:   return hand
-        case .effect: return effect
-        }
-    }
-
-    public mutating func setOffset(_ offset: PixelOffset, for slot: EquipmentSlot) {
-        switch slot {
-        case .head:   head = offset
-        case .hand:   hand = offset
-        case .effect: effect = offset
-        }
-    }
-}
-
 public struct ActivityStats: Codable, Sendable, Equatable {
     public var prompts: Int
     public var toolUses: Int
@@ -93,7 +49,7 @@ public struct ActivityStats: Codable, Sendable, Equatable {
         self.sessions = sessions
     }
 
-    mutating func record(_ kind: EventKind) {
+    public mutating func record(_ kind: EventKind) {
         switch kind {
         case .prompt: prompts += 1
         case .toolUse: toolUses += 1
@@ -121,7 +77,6 @@ public struct PetState: Codable, Sendable {
     public var mbtiScores: MbtiScores
     public var personality: String?
     public var equippedItems: EquippedItems
-    public var equipmentOffsets: EquipmentOffsets?
     public var inventory: [Equipment]
     public var unlockedAchievements: [String]
     public var graveyardEntries: [GraveyardEntry]
@@ -196,7 +151,6 @@ public struct PetState: Codable, Sendable {
         self.mbtiScores = MbtiScores()
         self.personality = nil
         self.equippedItems = EquippedItems()
-        self.equipmentOffsets = EquipmentOffsets()
         self.inventory = []
         self.unlockedAchievements = []
         self.graveyardEntries = []
@@ -235,26 +189,36 @@ public struct PetRoster: Codable, Sendable {
     /// per-pet values are retained for backward compatibility with old views.
     public var globalUnlockedAchievements: [String]
     public var globalGraveyardEntries: [GraveyardEntry]
+    /// Account-wide coding activity. Optional keeps existing multi-pet saves
+    /// decodable; the first save after upgrade persists the migrated value.
+    public var accountActivityStats: ActivityStats?
 
     public init(
         pets: [PetState],
         selectedIndex: Int = 0,
         xpRemainderCursor: Int = 0,
         globalUnlockedAchievements: [String] = [],
-        globalGraveyardEntries: [GraveyardEntry] = []
+        globalGraveyardEntries: [GraveyardEntry] = [],
+        accountActivityStats: ActivityStats? = nil
     ) {
         self.pets = Array(pets.prefix(Self.maximumPets))
         self.selectedIndex = min(max(0, selectedIndex), max(0, self.pets.count - 1))
         self.xpRemainderCursor = max(0, xpRemainderCursor)
         self.globalUnlockedAchievements = globalUnlockedAchievements
         self.globalGraveyardEntries = globalGraveyardEntries
+        self.accountActivityStats = accountActivityStats
     }
 
     public init(legacy state: PetState) {
         self.init(
             pets: [state],
             globalUnlockedAchievements: state.unlockedAchievements,
-            globalGraveyardEntries: state.graveyardEntries
+            globalGraveyardEntries: state.graveyardEntries,
+            accountActivityStats: ActivityStats(
+                prompts: state.totalPrompts,
+                toolUses: state.totalToolUses,
+                sessions: state.totalSessions
+            )
         )
     }
 
@@ -272,6 +236,24 @@ public struct PetRoster: Codable, Sendable {
     }
 
     public var canAddPet: Bool { pets.count < Self.maximumPets }
+
+    public var activityStats: ActivityStats {
+        accountActivityStats ?? legacyActivityStats
+    }
+
+    /// Older multi-pet builds mirrored every event into every active slot.
+    /// Taking each high-water mark prevents that mirrored history from being
+    /// counted multiple times during the account-stat migration.
+    public mutating func migrateAccountActivityStatsIfNeeded() {
+        guard accountActivityStats == nil else { return }
+        accountActivityStats = legacyActivityStats
+    }
+
+    public mutating func recordAccountActivity(_ kind: EventKind) {
+        var stats = activityStats
+        stats.record(kind)
+        accountActivityStats = stats
+    }
 
     /// Returns a deterministic, fair integer split and advances the remainder
     /// cursor. The sum of all returned shares always equals `totalXP`.
@@ -309,5 +291,13 @@ public struct PetRoster: Codable, Sendable {
         globalUnlockedAchievements = Array(Set(globalUnlockedAchievements + pet.unlockedAchievements)).sorted()
         let knownIds = Set(globalGraveyardEntries.map(\.id))
         globalGraveyardEntries += pet.graveyardEntries.filter { !knownIds.contains($0.id) }
+    }
+
+    private var legacyActivityStats: ActivityStats {
+        ActivityStats(
+            prompts: pets.map(\.totalPrompts).max() ?? 0,
+            toolUses: pets.map(\.totalToolUses).max() ?? 0,
+            sessions: pets.map(\.totalSessions).max() ?? 0
+        )
     }
 }

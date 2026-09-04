@@ -84,3 +84,10 @@ private func teamProfile(
     #expect(decoded.id == original.id)
     #expect(decoded.members.map(\.id) == ["p1", "p2"])
 }
+
+@Test func tournamentMembersUseTheSmallerParticipantRosterCount() {
+    let mine = [teamProfile("m1", name: "내 첫째"), teamProfile("m2", name: "내 둘째"), teamProfile("m3", name: "내 셋째")]
+    let limited = BattleTeamProfile.tournamentMembers(mine, opponentMemberCount: 2)
+
+    #expect(limited.map(\.id) == ["m1", "m2"])
+}

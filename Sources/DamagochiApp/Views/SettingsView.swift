@@ -134,20 +134,14 @@ struct SettingsView: View {
     // MARK: - Activity Stats
 
     private var activityStatsSection: some View {
-        let claude = viewModel.state.stats(for: .claude)
-        let codex = viewModel.state.stats(for: .codex)
-        let unclassified = viewModel.state.unclassifiedStats
+        let account = viewModel.accountActivityStats
 
         return VStack(alignment: .leading, spacing: 8) {
             Label("활동 통계", systemImage: "chart.bar.fill")
                 .font(.caption.bold())
 
             statsHeader
-            activityStatsRow("Claude Code", stats: claude)
-            activityStatsRow("Codex", stats: codex)
-            if unclassified.prompts > 0 || unclassified.toolUses > 0 || unclassified.sessions > 0 {
-                activityStatsRow("기존 미분류", stats: unclassified)
-            }
+            activityStatsRow("계정 전체", stats: account)
         }
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 8).fill(.quaternary.opacity(0.3)))
@@ -217,7 +211,7 @@ struct SettingsView: View {
     }
 
     private func petInfoCard(_ pet: PetState, index: Int) -> some View {
-        let profile = BattleProfile.from(pet)
+        let profile = viewModel.battleProfile(for: pet)
         return VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 5) {
                 Text("슬롯 \(index + 1)").font(.system(size: 9, weight: .bold)).foregroundStyle(.secondary)
