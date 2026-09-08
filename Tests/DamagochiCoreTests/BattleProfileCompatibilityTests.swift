@@ -24,6 +24,7 @@ import Testing
     let profile = try JSONDecoder().decode(BattleProfile.self, from: Data(legacyJSON.utf8))
 
     #expect(profile.stage == nil)
+    #expect(profile.petLevel == nil)
     #expect(profile.petName == "레거시 펫")
 }
 
@@ -36,6 +37,8 @@ import Testing
     let profile = BattleProfile.from(state)
 
     #expect(profile?.stage == .stage2)
+    #expect(profile?.petLevel == 15)
+    #expect(profile?.battleLevel == 15)
 }
 
 @Test func battleLevelCapsAtFiftyWithoutChangingStoredPet() {
@@ -55,11 +58,26 @@ import Testing
 
     #expect(capped?.battleLevel == 50)
     #expect(overCapped?.battleLevel == 50)
+    #expect(capped?.petLevel == 50)
+    #expect(overCapped?.petLevel == 99)
     #expect(capped?.stats.atk == overCapped?.stats.atk)
     #expect(capped?.stats.int_ == overCapped?.stats.int_)
     #expect(capped?.stats.maxHp == overCapped?.stats.maxHp)
     #expect(capped?.stats.spd == overCapped?.stats.spd)
     #expect(levelNinetyNine.level == 99)
+}
+
+@Test func battleProfilePreservesActualAndCappedLevelsWhenTransmitted() throws {
+    var state = PetState(machineId: "high-level")
+    state.phase = .alive
+    state.species = "cat"
+    state.level = 99
+    let profile = try #require(BattleProfile.from(state))
+
+    let decoded = try JSONDecoder().decode(BattleProfile.self, from: JSONEncoder().encode(profile))
+
+    #expect(decoded.petLevel == 99)
+    #expect(decoded.battleLevel == 50)
 }
 
 @Test func battleProfilesUseSlotIdentityWhenAvailable() {

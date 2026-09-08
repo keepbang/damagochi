@@ -7,6 +7,7 @@ struct BattleView: View {
     @ObservedObject var battleVM: BattleViewModel
     @ObservedObject var petVM: PetViewModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var showingHistory = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -22,6 +23,9 @@ struct BattleView: View {
         .onChange(of: petVM.state.phase.rawValue) { _, _ in battleVM.syncPetState() }
         .onChange(of: petVM.state.species) { _, _ in battleVM.syncPetState() }
         .onChange(of: petVM.state.name) { _, _ in battleVM.syncPetState() }
+        .sheet(isPresented: $showingHistory) {
+            BattleHistoryView(entries: petVM.roster.battleHistory ?? [])
+        }
     }
 
     private var header: some View {
@@ -29,6 +33,8 @@ struct BattleView: View {
             HStack(spacing: 6) {
                 Text("배틀").font(.headline)
                 Spacer()
+                Button("이력", systemImage: "clock.arrow.circlepath") { showingHistory = true }
+                    .controlSize(.mini)
                 switch battleVM.phase {
                 case .browsing where battleVM.canBattle:
                     statusPill("탐색 중", progress: true)
@@ -188,7 +194,10 @@ struct BattleView: View {
                     Text(profile.petName).font(.subheadline.bold()).lineLimit(1)
                     rarityBadge(profile.speciesRarity)
                     Spacer()
-                    Text("Lv.\(petVM.state.level)").font(.caption).foregroundStyle(.secondary)
+                    if let level = profile.petLevel ?? profile.battleLevel {
+                        Text("Lv.\(level)").font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(1).fixedSize()
+                    }
                 }
                 statGrid(profile.stats)
                 if battleVM.selectableProfiles.count > 1 {
@@ -404,7 +413,7 @@ struct BattleView: View {
     private func resultView(won: Bool) -> some View {
         VStack(spacing: 12) {
             Spacer()
-            Text(won ? "🏆 승리!" : "💀 패배").font(.title.bold())
+            Text(battleVM.lastOutcome == .draw ? "🤝 무승부" : (won ? "🏆 승리!" : "💀 패배")).font(.title.bold())
                 .foregroundStyle(won ? .yellow : .secondary)
             if let turns = battleVM.battleState?.turn {
                 Text("\(max(0, turns - 1))턴 만에 종료").font(.caption).foregroundStyle(.secondary)
@@ -440,6 +449,7 @@ struct BattleView: View {
         VStack(spacing: 1) {
             Text(label).font(.system(size: 8)).foregroundStyle(.secondary)
             Text("\(value)").font(.system(size: 10, design: .monospaced).bold())
+                .lineLimit(1).minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity)
     }
@@ -469,7 +479,7 @@ private struct TournamentPetSelectionRow: View {
                     .background(selected ? Color.teal.opacity(0.25) : Color.secondary.opacity(0.12), in: Circle())
                 VStack(alignment: .leading, spacing: 1) {
                     Text(profile.petName).font(.caption.bold())
-                    Text("Lv.\(profile.battleLevel ?? 0) · \(profile.mbtiGroup.rawValue.uppercased())")
+                    Text("\((profile.petLevel ?? profile.battleLevel).map { "Lv.\($0) · " } ?? "")\(profile.mbtiGroup.rawValue.uppercased())")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -496,8 +506,13 @@ private struct TeamProfileGrid: View {
                 let fainted = profile.stats.currentHp <= 0
                 VStack(spacing: 1) {
                     Text(profile.petName).font(.system(size: 8, weight: isActive ? .bold : .regular)).lineLimit(1)
+                    if let level = activeID == nil ? (profile.petLevel ?? profile.battleLevel) : profile.battleLevel {
+                        Text("Lv.\(level)").font(.system(size: 7)).foregroundStyle(.secondary)
+                            .lineLimit(1).minimumScaleFactor(0.6)
+                    }
                     Text("\(max(0, profile.stats.currentHp))/\(profile.stats.maxHp)")
                         .font(.system(size: 7, design: .monospaced))
+                        .lineLimit(1).minimumScaleFactor(0.6)
                 }
                 .foregroundStyle(fainted ? .secondary : .primary)
                 .opacity(fainted ? 0.42 : 1)
@@ -593,10 +608,16 @@ private struct CombatantHUD: View {
                     Text("Lv.\(battleLevel)")
                         .font(.system(size: 7, weight: .medium, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.72))
+                        .lineLimit(1).fixedSize()
                 }
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 4) {
+                Text("HP").font(.system(size: 7, weight: .bold)).foregroundStyle(.white.opacity(0.72))
                 Spacer(minLength: 0)
                 Text("\(profile.stats.currentHp)/\(profile.stats.maxHp)")
                     .font(.system(size: 8, design: .monospaced)).foregroundStyle(.white.opacity(0.78))
+                    .lineLimit(1).minimumScaleFactor(0.6)
             }
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {

@@ -188,13 +188,36 @@ struct InventoryView: View {
                 .font(.caption.bold())
                 .foregroundStyle(.secondary)
 
-            VStack(spacing: 0) {
-                ForEach(viewModel.state.inventory) { item in
-                    ItemRow(item: item, isEquipped: isItemEquipped(item)) {
-                        if isItemEquipped(item) {
-                            viewModel.unequip(slot: item.slot)
-                        } else {
-                            viewModel.equip(itemId: item.id)
+            ForEach(EquipmentSlot.allCases, id: \.self) { slot in
+                let items = inventoryItems(for: slot)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Label(slotLabel(slot), systemImage: slotIcon(slot))
+                        Text("\(items.count)개")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("높은 등급순")
+                            .foregroundStyle(.tertiary)
+                    }
+                    .font(.system(size: 10, weight: .semibold))
+                    .padding(.top, 6)
+
+                    if items.isEmpty {
+                        Text("보유한 아이템이 없습니다")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .padding(.vertical, 6)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(items) { item in
+                                ItemRow(item: item, isEquipped: isItemEquipped(item)) {
+                                    if isItemEquipped(item) {
+                                        viewModel.unequip(slot: item.slot)
+                                    } else {
+                                        viewModel.equip(itemId: item.id)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -223,6 +246,13 @@ struct InventoryView: View {
     }
 
     // MARK: - Helpers
+
+    private func inventoryItems(for slot: EquipmentSlot) -> [Equipment] {
+        let rarityOrder: [Rarity: Int] = [.mythic: 0, .legendary: 1, .rare: 2, .common: 3]
+        return viewModel.state.inventory
+            .filter { $0.slot == slot }
+            .sorted { rarityOrder[$0.rarity, default: 3] < rarityOrder[$1.rarity, default: 3] }
+    }
 
     private func isItemEquipped(_ item: Equipment) -> Bool {
         switch item.slot {

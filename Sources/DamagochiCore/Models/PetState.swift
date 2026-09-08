@@ -192,6 +192,8 @@ public struct PetRoster: Codable, Sendable {
     /// Account-wide coding activity. Optional keeps existing multi-pet saves
     /// decodable; the first save after upgrade persists the migrated value.
     public var accountActivityStats: ActivityStats?
+    /// Optional for compatibility with saves made before battle history.
+    public var battleHistory: [BattleHistoryEntry]?
 
     public init(
         pets: [PetState],

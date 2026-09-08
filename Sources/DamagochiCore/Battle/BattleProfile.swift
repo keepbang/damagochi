@@ -28,6 +28,8 @@ public struct BattleProfile: Codable, Sendable, Identifiable {
     public let speciesId: String
     /// Optional so profiles sent by older app versions remain decodable.
     public let stage: Stage?
+    /// Actual pet level for roster and matchmaking displays; absent in older profiles.
+    public let petLevel: Int?
     /// Battle-only capped level. The stored pet level is never mutated.
     public let battleLevel: Int?
     /// Appearance snapshot captured when the profile is sent.
@@ -48,6 +50,7 @@ public struct BattleProfile: Codable, Sendable, Identifiable {
         stats: BattleStats,
         stage: Stage? = nil,
         battleLevel: Int? = nil,
+        petLevel: Int? = nil,
         equippedItems: EquippedItems? = nil,
         equippedEquipment: [Equipment]? = nil
     ) {
@@ -59,6 +62,7 @@ public struct BattleProfile: Codable, Sendable, Identifiable {
         self.speciesRarity = speciesRarity
         self.stats = stats
         self.battleLevel = battleLevel
+        self.petLevel = petLevel
         self.equippedItems = equippedItems
         self.equippedEquipment = equippedEquipment
     }
@@ -101,6 +105,7 @@ public extension BattleProfile {
             stats: stats,
             stage: state.stage,
             battleLevel: effectiveBattleLevel,
+            petLevel: state.level,
             equippedItems: EquippedItems(effect: state.equippedItems.effect),
             equippedEquipment: equippedEquipment(from: state)
         )

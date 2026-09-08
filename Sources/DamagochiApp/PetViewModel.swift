@@ -803,6 +803,11 @@ final class PetViewModel: ObservableObject {
         NSApp.terminate(nil)
     }
 
+    func recordBattle(_ entry: BattleHistoryEntry) {
+        roster.recordBattle(entry)
+        save()
+    }
+
     func save() {
         synchronizeSelectedPet()
         roster.migrateAccountActivityStatsIfNeeded()

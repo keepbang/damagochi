@@ -43,6 +43,7 @@ final class BattleViewModel: ObservableObject {
     @Published var teamBattleState: TeamBattleState?
     @Published var turnPhase: TurnPhase = .selectingSkill
     @Published var lastReward: BattleReward?
+    @Published private(set) var lastOutcome: BattleOutcome?
     @Published var errorMessage: String?
     @Published var selectedSkillId: String?
     @Published var selectionSecondsRemaining = Int(BattleTimeout.skillSelectSeconds)
@@ -79,6 +80,7 @@ final class BattleViewModel: ObservableObject {
     private var activePeerId: String?
     private var ignoredPeerIds: Set<String> = []
     private var tournamentSelectionTask: Task<Void, Never>?
+    private var currentHistory: BattleHistoryEntry?
 
     private static let tournamentSelectionSeconds = 60
 
@@ -273,16 +275,15 @@ final class BattleViewModel: ObservableObject {
     }
 
     func forfeit() {
-        cancelSessionTasks()
+        guard phase == .inBattle else { return }
         try? transport.send(.forfeit)
+        completeBattle(outcome: .defeat, reason: "기권")
         transport.disconnect()
         activePeerId = nil
-        teamBattleState = nil
-        phase = .finished(won: false)
-        applyReward(won: false)
     }
 
     func reset() {
+        recordInterruptedBattle(reason: "배틀 종료")
         cancelSessionTasks()
         if let activePeerId { ignoredPeerIds.insert(activePeerId) }
         stopBrowsing()
@@ -293,6 +294,7 @@ final class BattleViewModel: ObservableObject {
         clearTurnState()
         battlePresentation = nil
         lastReward = nil
+        lastOutcome = nil
         errorMessage = nil
         phase = .browsing
         foundPeers = []
@@ -403,8 +405,7 @@ final class BattleViewModel: ObservableObject {
             cancelSessionTasks()
             if phase == .inBattle {
                 errorMessage = "상대방 연결이 끊어졌습니다"
-                phase = .finished(won: true)
-                applyReward(won: true)
+                completeBattle(outcome: .victory, reason: "상대 연결 끊김")
             } else if case .connecting = phase {
                 recoverToBrowsing(message: "상대방과 연결하지 못했습니다")
             }
@@ -441,6 +442,7 @@ final class BattleViewModel: ObservableObject {
             connectTask?.cancel()
             connectTask = nil
             battleState = BattleState(me: myProfile, opponent: profile)
+            beginHistory(myPets: [myProfile], opponentPets: [profile])
             phase = .inBattle
             turnPhase = .selectingSkill
             clearTurnState()
@@ -472,6 +474,7 @@ final class BattleViewModel: ObservableObject {
             connectTask = nil
             teamBattleState = team
             battleState = team.activeBattle
+            beginHistory(myPets: myTournamentMembers, opponentPets: opponentTournamentMembers)
             phase = .inBattle
             turnPhase = .selectingSkill
             clearTurnState()
@@ -509,11 +512,9 @@ final class BattleViewModel: ObservableObject {
 
         case .forfeit:
             guard phase == .inBattle else { return }
-            cancelSessionTasks()
+            completeBattle(outcome: .victory, reason: "상대 기권")
             transport.disconnect()
             activePeerId = nil
-            phase = .finished(won: true)
-            applyReward(won: true)
         }
     }
 
@@ -554,6 +555,7 @@ final class BattleViewModel: ObservableObject {
             BattleEngine.resolveTurn(state: &state, mySkillId: myId, opponentSkillId: opId)
         }
         battleState = state
+        if mode == .team { persistHistoryProgress() }
         battlePresentation = BattlePresentation(
             myDamage: max(0, myHpBefore - state.myProfile.stats.currentHp),
             opponentDamage: max(0, opponentHpBefore - state.opponentProfile.stats.currentHp)
@@ -584,8 +586,7 @@ final class BattleViewModel: ObservableObject {
                         ? self.teamBattleState?.status != .ongoing
                         : self.battleState?.status != .ongoing)
                 else { return }
-                self.phase = .finished(won: won)
-                self.applyReward(won: won)
+                self.completeBattle(outcome: won ? .victory : .defeat)
             }
         } else {
             turnPhase = .selectingSkill
@@ -676,6 +677,7 @@ final class BattleViewModel: ObservableObject {
     }
 
     private func recoverToBrowsing(message: String?, ignoreActivePeer: Bool = false) {
+        recordInterruptedBattle(reason: message ?? "배틀 중단")
         if ignoreActivePeer, let activePeerId {
             ignoredPeerIds.insert(activePeerId)
         }
@@ -688,6 +690,7 @@ final class BattleViewModel: ObservableObject {
         battlePresentation = nil
         clearTurnState()
         lastReward = nil
+        lastOutcome = nil
         foundPeers = []
         phase = .browsing
         startBrowsing()
@@ -771,6 +774,82 @@ final class BattleViewModel: ObservableObject {
         isTournamentOrderReady = tournamentPetIDs.count >= 2
         tournamentSelectionTask?.cancel()
         tournamentSelectionTask = nil
+    }
+
+    // MARK: - History
+
+    private func beginHistory(myPets: [BattleProfile], opponentPets: [BattleProfile]) {
+        guard let peerID = activePeerId else { return }
+        lastOutcome = nil
+        lastReward = nil
+        let name = foundPeers.first(where: { $0.id == peerID })?.name
+            ?? opponentPets.first?.petName ?? peerID
+        currentHistory = BattleHistoryEntry(
+            mode: mode, opponentID: peerID, opponentName: name,
+            myPets: myPets, opponentPets: opponentPets
+        )
+        persistHistoryProgress()
+    }
+
+    private func persistHistoryProgress() {
+        guard var entry = currentHistory else { return }
+        // Keep actual entrants even if the app closes before the final result.
+        entry.myPets = Array(entry.myPets.prefix((teamBattleState?.myActiveIndex ?? 0) + 1))
+        entry.opponentPets = Array(entry.opponentPets.prefix((teamBattleState?.opponentActiveIndex ?? 0) + 1))
+        entry.reason = "배틀이 완료되지 않았습니다"
+        petViewModel?.recordBattle(entry)
+    }
+
+    private var resolvedOutcome: BattleOutcome? {
+        if let team = teamBattleState {
+            switch team.status {
+            case .victory: return .victory
+            case .defeat: return .defeat
+            case .ongoing: return nil
+            }
+        }
+        switch battleState?.status {
+        case .victory: return .victory
+        case .defeat: return .defeat
+        case .draw: return .draw
+        default: return nil
+        }
+    }
+
+    private func completeBattle(outcome: BattleOutcome, reason: String? = nil) {
+        guard phase == .inBattle else { return }
+        // The finishing animation can overlap a disconnect or a forfeit.
+        // A resolved combat result always takes precedence over those events.
+        let result = resolvedOutcome ?? outcome
+        cancelSessionTasks()
+        finishHistory(outcome: result, reason: resolvedOutcome == nil ? reason : nil)
+        lastOutcome = result
+        phase = .finished(won: result == .victory)
+        if result == .victory || result == .defeat {
+            applyReward(won: result == .victory)
+        }
+    }
+
+    private func recordInterruptedBattle(reason: String) {
+        guard currentHistory != nil else { return }
+        if resolvedOutcome != nil, phase == .inBattle {
+            completeBattle(outcome: .interrupted)
+        } else {
+            finishHistory(outcome: .interrupted, reason: reason)
+        }
+    }
+
+    private func finishHistory(outcome: BattleOutcome, reason: String?) {
+        guard var entry = currentHistory else { return }
+        currentHistory = nil
+        entry.endedAt = Date()
+        entry.outcome = outcome
+        entry.reason = reason
+        if let team = teamBattleState {
+            entry.myPets = Array(entry.myPets.prefix(team.myActiveIndex + 1))
+            entry.opponentPets = Array(entry.opponentPets.prefix(team.opponentActiveIndex + 1))
+        }
+        petViewModel?.recordBattle(entry)
     }
 
     // MARK: - Reward
